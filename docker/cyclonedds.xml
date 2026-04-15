@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CycloneDDS xmlns="https://cdds.io/config">
+  <Domain>
+    <General>
+      <AllowMulticast>false</AllowMulticast>
+    </General>
+
+    <Discovery>
+      <Peers>
+        <!-- Docker host -->
+        <Peer address="192.168.1.202"/>
+
+        <!-- Other machine running ROS 2 -->
+        <Peer address="192.168.1.78"/>
+      </Peers>
+    </Discovery>
+
+    <Tracing>
+      <Verbosity>severe</Verbosity>
+    </Tracing>
+  </Domain>
+</CycloneDDS>

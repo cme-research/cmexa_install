@@ -1,0 +1,46 @@
+services:
+  mosquitto:
+    image: eclipse-mosquitto:latest
+    container_name: mosquitto
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - ./docker/mosquitto/bridge.conf:/mosquitto/config/mosquitto.conf:ro
+      - mosquitto_data:/mosquitto/data
+      - mosquitto_log:/mosquitto/log
+    healthcheck:
+      test: ["CMD-SHELL", "mosquitto_sub -h localhost -t '$$SYS/#' -C 1 -i healthcheck -W 3 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+  webapp:
+    image: cmeresearch/webapp:test
+    container_name: cmexa-webapp
+    restart: unless-stopped
+    network_mode: host
+    depends_on:
+      mosquitto:
+        condition: service_healthy
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+
+  robot:
+    image: cmeresearch/cmexaiii:test
+    container_name: cmexaiii-robot
+    restart: unless-stopped
+    network_mode: host
+    privileged: true
+    ipc: host
+    depends_on:
+      mosquitto:
+        condition: service_healthy
+    volumes:
+      - /dev/input:/dev/input
+    device_cgroup_rules:
+      - 'c 189:* rmw'
+
+volumes:
+  mosquitto_data:
+  mosquitto_log:
