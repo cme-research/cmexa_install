@@ -17,7 +17,7 @@ services:
       start_period: 5s
 
   webapp:
-    image: cmeresearch/webapp:test
+    image: cmeresearch/amr_webcontrol:test
     container_name: cmexa-webapp
     restart: unless-stopped
     network_mode: host

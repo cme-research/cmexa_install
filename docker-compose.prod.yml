@@ -19,7 +19,7 @@ services:
       start_period: 5s
 
   webapp:
-    image: ghcr.io/cme-research/cmexa_webapp:latest
+    image: ghcr.io/cme-research/cmeresearch_amr_webcontrol:latest
     container_name: cmexa-webapp
     restart: unless-stopped
     network_mode: host

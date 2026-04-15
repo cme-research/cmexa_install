@@ -39,3 +39,7 @@ repositories:
     type: git
     url: https://github.com/cme-research/dual_laser_merger.git
     version: jazzy
+  cmeresearch_amr_webcontrol:
+    type: git
+    url: https://github.com/cme-research/cmeresearch_amr_webcontrol.git
+    version: jazzy_dev
