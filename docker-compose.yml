@@ -1,4 +1,5 @@
 services:
+
   mosquitto:
     image: eclipse-mosquitto:latest
     container_name: mosquitto
@@ -26,9 +27,20 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
 
-  robot:
-    image: cmeresearch/cmexaiii:test
-    container_name: cmexaiii-robot
+  brickd:
+    image: cmeresearch/brickd:1.0
+    container_name: cmexa-brickd
+    restart: unless-stopped
+    network_mode: host
+    privileged: true
+    device_cgroup_rules:
+      - 'c 189:* rmw'
+    volumes:
+      - /dev/bus/usb:/dev/bus/usb
+
+  hardware:
+    image: cmeresearch/cmexaiii-hardware:test
+    container_name: cmexaiii-hardware
     restart: unless-stopped
     network_mode: host
     privileged: true
@@ -36,10 +48,30 @@ services:
     depends_on:
       mosquitto:
         condition: service_healthy
+      brickd:
+        condition: service_started
     volumes:
       - /dev/input:/dev/input
     device_cgroup_rules:
       - 'c 189:* rmw'
+    group_add:
+      - "${INPUT_GID}"
+    environment:
+      - ROBOT=cmexaiii
+      - ROBOT_ENV=house
+
+  nav:
+    image: cmeresearch/cmexaiii-nav:test
+    container_name: cmexaiii-nav
+    restart: unless-stopped
+    network_mode: host
+    ipc: host
+    depends_on:
+      hardware:
+        condition: service_started
+    command: ros2 launch cmeresearch_bringup ${LAUNCH_FILE:-cmexaiii_nav_mapping.launch.py}
+    volumes:
+      - /robot/data/maps:/maps
 
 volumes:
   mosquitto_data:

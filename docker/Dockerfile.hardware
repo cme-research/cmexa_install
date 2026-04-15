@@ -1,0 +1,97 @@
+FROM ros:jazzy-ros-base-noble
+
+LABEL maintainer="Christian Ehrmann"
+LABEL version="1.0"
+LABEL description="CMEXAIII hardware stack: ros2_control, stepper drivers, LiDAR, MQTT bridge"
+
+SHELL ["/bin/bash", "-c"]
+
+ENV DEBIAN_FRONTEND=noninteractive
+RUN echo 'debconf debconf/frontend select Noninteractive' | debconf-set-selections
+
+RUN apt-get update && apt-get install --no-install-recommends -y \
+    build-essential \
+    git \
+    python3-colcon-common-extensions \
+    python3-colcon-mixin \
+    python3-rosdep \
+    python3-vcstool \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN apt-get update && apt-get -y install \
+    curl \
+    software-properties-common \
+    vim \
+    wget \
+    joystick \
+    python3-pip \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN add-apt-repository universe
+
+RUN apt-get update \
+    && apt-get upgrade -y \
+    && apt-get install -y ros-dev-tools python3-rosdep \
+    && rm -rf /var/lib/apt/lists/*
+
+# CycloneDDS — required workaround for ROS2 on Raspberry Pi aarch64
+RUN apt-get update \
+    && apt-get install -y ros-jazzy-rmw-cyclonedds-cpp \
+    && rm -rf /var/lib/apt/lists/*
+
+ENV PIP_BREAK_SYSTEM_PACKAGES=1
+ENV CATKIN_WS=/robot/ros2_ws
+
+# Clone hardware packages from GitHub
+RUN mkdir -p /robot/ros2_ws/src \
+    && cd /robot/ros2_ws/src \
+    && git clone -b jazzy https://github.com/cme-research/cmeresearch_bringup.git \
+    && git clone -b jazzy https://github.com/cme-research/cmeresearch_description.git \
+    && git clone -b jazzy https://github.com/cme-research/cmeresearch_msgs.git \
+    && git clone -b jazzy https://github.com/cme-research/cmexa_base.git \
+    && git clone -b jazzy https://github.com/cme-research/cmeresearch_stepper_driver.git \
+    && git clone -b jazzy https://github.com/cme-research/mqtt_bridge.git \
+    && git clone -b jazzy https://github.com/cme-research/joy2twist.git \
+    && git clone -b jazzy https://github.com/cme-research/ldlidar_stl_ros2.git \
+    && git clone -b jazzy https://github.com/cme-research/dual_laser_merger.git
+
+# TinkerForge python bindings (stepper driver dependency)
+RUN wget https://download.tinkerforge.com/apt/$(. /etc/os-release; echo $ID)/tinkerforge.gpg -q -O - \
+    | tee /etc/apt/trusted.gpg.d/tinkerforge.gpg > /dev/null \
+    && echo "deb https://download.tinkerforge.com/apt/$(. /etc/os-release; echo $ID $VERSION_CODENAME) main" \
+    | tee /etc/apt/sources.list.d/tinkerforge.list \
+    && apt-get update \
+    && apt-get install python3-tinkerforge -y \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install ROS dependencies — skip nav2/slam/rviz (nav container handles those)
+RUN source /opt/ros/jazzy/setup.bash \
+    && cd /robot/ros2_ws \
+    && apt-get update \
+    && rosdep update \
+    && rosdep fix-permissions \
+    && rosdep install -y -r --from-paths src --ignore-src --rosdistro=jazzy \
+       --skip-keys "nav2_bringup slam_toolbox rviz2 web_video_server" \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN apt-get update
+RUN source /opt/ros/jazzy/setup.bash \
+    && cd /robot/ros2_ws \
+    && colcon build
+
+RUN cd /robot/ros2_ws \
+    && rm -rf build log src
+
+RUN rm -rf /var/lib/apt/lists/*
+
+RUN echo "source /ros_entrypoint.sh" >> /root/.bashrc
+
+COPY ros_entrypoint.sh /
+RUN chmod +x /ros_entrypoint.sh
+
+COPY cyclonedds.xml /
+
+ENV ROBOT=cmexaiii
+
+ENTRYPOINT ["/ros_entrypoint.sh"]
+CMD ["ros2", "launch", "cmeresearch_bringup", "cmexaiii_hardware.launch.py"]

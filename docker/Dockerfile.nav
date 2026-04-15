@@ -1,0 +1,83 @@
+FROM ros:jazzy-ros-base-noble
+
+LABEL maintainer="Christian Ehrmann"
+LABEL version="1.0"
+LABEL description="CMEXAIII nav stack: nav2, slam_toolbox. Switch modes via LAUNCH_FILE env var."
+
+SHELL ["/bin/bash", "-c"]
+
+ENV DEBIAN_FRONTEND=noninteractive
+RUN echo 'debconf debconf/frontend select Noninteractive' | debconf-set-selections
+
+RUN apt-get update && apt-get install --no-install-recommends -y \
+    build-essential \
+    git \
+    python3-colcon-common-extensions \
+    python3-colcon-mixin \
+    python3-rosdep \
+    python3-vcstool \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN apt-get update && apt-get -y install \
+    curl \
+    software-properties-common \
+    vim \
+    wget \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN add-apt-repository universe
+
+RUN apt-get update \
+    && apt-get upgrade -y \
+    && apt-get install -y ros-dev-tools python3-rosdep \
+    && rm -rf /var/lib/apt/lists/*
+
+# CycloneDDS — required workaround for ROS2 on Raspberry Pi aarch64
+RUN apt-get update \
+    && apt-get install -y ros-jazzy-rmw-cyclonedds-cpp \
+    && rm -rf /var/lib/apt/lists/*
+
+ENV CATKIN_WS=/robot/ros2_ws
+
+# Clone nav packages from GitHub
+RUN mkdir -p /robot/ros2_ws/src \
+    && cd /robot/ros2_ws/src \
+    && git clone -b jazzy https://github.com/cme-research/cmeresearch_bringup.git \
+    && git clone -b jazzy https://github.com/cme-research/cmeresearch_msgs.git \
+    && git clone -b jazzy https://github.com/cme-research/cmeresearch_environments.git
+
+# Install ROS dependencies (nav2_bringup and slam_toolbox pulled via cmeresearch_bringup package.xml)
+# Skip hardware-specific packages not present in this image
+RUN source /opt/ros/jazzy/setup.bash \
+    && cd /robot/ros2_ws \
+    && apt-get update \
+    && rosdep update \
+    && rosdep fix-permissions \
+    && rosdep install -y -r --from-paths src --ignore-src --rosdistro=jazzy \
+       --skip-keys "rviz2 web_video_server" \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN apt-get update
+RUN source /opt/ros/jazzy/setup.bash \
+    && cd /robot/ros2_ws \
+    && colcon build
+
+RUN cd /robot/ros2_ws \
+    && rm -rf build log src
+
+RUN rm -rf /var/lib/apt/lists/*
+
+RUN echo "source /ros_entrypoint.sh" >> /root/.bashrc
+
+COPY ros_entrypoint.sh /
+RUN chmod +x /ros_entrypoint.sh
+
+COPY cyclonedds.xml /
+
+# Volume mount point for maps (localization mode)
+RUN mkdir -p /maps
+
+ENV ROBOT=cmexaiii
+
+ENTRYPOINT ["/ros_entrypoint.sh"]
+CMD ["ros2", "launch", "cmeresearch_bringup", "cmexaiii_nav_mapping.launch.py"]

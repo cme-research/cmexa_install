@@ -1,0 +1,41 @@
+repositories:
+  cmeresearch_bringup:
+    type: git
+    url: https://github.com/cme-research/cmeresearch_bringup.git
+    version: jazzy_dev
+  cmeresearch_description:
+    type: git
+    url: https://github.com/cme-research/cmeresearch_description.git
+    version: jazzy_dev
+  cmeresearch_environments:
+    type: git
+    url: https://github.com/cme-research/cmeresearch_environments.git
+    version: jazzy_dev
+  cmeresearch_msgs:
+    type: git
+    url: https://github.com/cme-research/cmeresearch_msgs.git
+    version: jazzy_dev
+  cmeresearch_stepper_driver:
+    type: git
+    url: https://github.com/cme-research/cmeresearch_stepper_driver.git
+    version: jazzy_dev
+  cmexa_base:
+    type: git
+    url: https://github.com/cme-research/cmexa_base.git
+    version: jazzy_dev
+  joy2twist:
+    type: git
+    url: https://github.com/cme-research/joy2twist.git
+    version: jazzy_dev
+  ldlidar_stl_ros2:
+    type: git
+    url: https://github.com/cme-research/ldlidar_stl_ros2.git
+    version: jazzy_dev
+  mqtt_bridge:
+    type: git
+    url: https://github.com/cme-research/mqtt_bridge.git
+    version: jazzy_dev
+  dual_laser_merger:
+    type: git
+    url: https://github.com/cme-research/dual_laser_merger.git
+    version: jazzy
