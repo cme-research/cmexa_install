@@ -108,27 +108,106 @@ docker compose -f docker-compose.prod.yml logs -f hardware
 
 ## CI/CD Pipeline
 
-Images are built automatically via GitHub Actions on every push to the `jazzy` branch and on `v*` tags.
+Images are built once on merge to `jazzy` and **promoted** (retagged, not rebuilt) when you push a `v*` tag. Releases are byte-identical to what was tested on the merge commit, and tag-to-published is seconds, not minutes.
+
+### Branch model
+
+| Branch | Purpose | Protection |
+|---|---|---|
+| `jazzy_dev` | Active development. Push freely. | None |
+| `jazzy` | Stable. Direct pushes blocked. Merges only via PR from `jazzy_dev`, all CI checks must pass. | Ruleset *Protect jazzy* |
+
+PRs into `jazzy` from any branch other than `jazzy_dev` are rejected by the `verify-source` check.
 
 ### Versioning
 
-| Event | Tags produced |
+| Event | Tags produced on `cmexa_hardware` and `cmexa_nav` |
 |---|---|
-| Push to `jazzy` | `:jazzy` |
-| Git tag `v1.2.3` | `:1.2.3`, `:1.2`, `:1`, `:latest` |
+| Merge PR into `jazzy` | `:jazzy`, `:jazzy-<full-sha>` (built fresh, multi-arch) |
+| Push tag `v1.2.3` | `:1.2.3`, `:1.2`, `:1`, `:latest` (retagged from `:jazzy-<sha>`, no rebuild) |
+| Push tag `v1.2.3-rc1` | `:1.2.3-rc1`, `:1.2`, `:1` (no `:latest` for pre-releases) |
 
-### Releasing a new version
+The ROS base image is pinned by digest in both Dockerfiles, so upstream `ros:jazzy-ros-base-noble` updates can't shift a release. Bump the digest deliberately when you want to pull in upstream changes (see [Bumping the ROS base image](#bumping-the-ros-base-image) below).
+
+### Releasing a new version — step by step
+
+> **Prerequisite:** your changes are on `jazzy_dev` and pass tests locally.
+
+**1. Open the release PR.** From the repo root on `jazzy_dev`:
 
 ```bash
-git tag v1.2.3
+gh pr create --base jazzy --head jazzy_dev \
+  --title "Release v1.2.3" \
+  --body "Release notes here"
+```
+
+**2. Wait for CI to go green.** Four required checks must pass:
+
+- `verify-source` — confirms the PR head is `jazzy_dev`
+- `colcon build` — native amd64 colcon build of the full workspace
+- `docker multi-arch (no push) (hardware)` — multi-arch hardware image builds
+- `docker multi-arch (no push) (nav)` — multi-arch nav image builds
+
+**3. Merge the PR.** This pushes `:jazzy` and `:jazzy-<sha>` images to GHCR. **Wait for the `Build` job to finish** (~10–20 min for multi-arch QEMU) — `Actions` tab on GitHub. Promotion in step 5 will fail if `:jazzy-<sha>` doesn't exist yet.
+
+**4. Pull the merge commit locally.**
+
+```bash
+git checkout jazzy
+git pull
+```
+
+**5. Tag and push.** Use [SemVer](https://semver.org). The tag must point to the merge commit produced in step 3:
+
+```bash
+git tag -a v1.2.3 -m "Release v1.2.3"
 git push origin v1.2.3
 ```
 
-GitHub Actions builds both images for `linux/amd64` and `linux/arm64` and pushes them to `ghcr.io/cme-research/`.
+**6. Promotion runs automatically** (~10–30 s). Watch the `Promote` job in `Actions`. It retags the existing `:jazzy-<sha>` manifest as `:1.2.3`, `:1.2`, `:1`, and `:latest`.
 
-### Branch conventions
+**7. Deploy on the robot.** SSH to the Pi:
 
-| Branch | Purpose |
-|---|---|
-| `jazzy` | Stable — triggers CI builds |
-| `jazzy_dev` | Active development |
+```bash
+cd ~/cmexa_install
+git pull
+bash deploy.sh --version 1.2.3
+```
+
+This writes `IMAGE_TAG=1.2.3` to `.env`, pulls the pinned images, and restarts services.
+
+**8. Create a GitHub release** (optional but recommended) — generates release notes and pins documentation to the tag:
+
+```bash
+gh release create v1.2.3 --generate-notes
+```
+
+### Pre-releases
+
+For release candidates and beta builds, use a pre-release suffix. They get version tags but **not** `:latest`, so `deploy.sh` (which defaults to `:latest`) won't pick them up unless you pass `--version` explicitly.
+
+```bash
+git tag -a v1.2.3-rc1 -m "Release candidate"
+git push origin v1.2.3-rc1
+# On robot:
+bash deploy.sh --version 1.2.3-rc1
+```
+
+### Hotfixing a released version
+
+Tags are immutable. To publish a fix, open a new PR from `jazzy_dev` → `jazzy`, merge, and tag the new merge commit as `v1.2.4`.
+
+### Bumping the ROS base image
+
+The base image digest is pinned in `docker/Dockerfile.hardware` and `docker/Dockerfile.nav`. To pull in upstream updates:
+
+```bash
+docker buildx imagetools inspect ros:jazzy-ros-base-noble \
+  --format '{{json .Manifest}}' | jq -r '.digest'
+```
+
+Replace the `sha256:…` in both Dockerfiles, open a PR, and follow the normal release flow.
+
+### Manual rebuild
+
+If a build needs to be re-run (e.g. transient registry failure), trigger `Docker Multi-Arch Build & Release` from the `Actions` tab via *Run workflow*.
