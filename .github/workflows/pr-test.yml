@@ -12,6 +12,10 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: ros:jazzy-ros-base-noble
+    env:
+      # Noble's Python 3.12 enforces PEP 668. rosdep installs some pip
+      # keys, which fails without this. Mirrors the Dockerfile.
+      PIP_BREAK_SYSTEM_PACKAGES: "1"
     steps:
       - name: Install build tooling
         run: |
