@@ -2,25 +2,30 @@
 # Deploy CMEXAIII robot stack from GHCR.
 #
 # Usage:
-#   bash deploy.sh                    # deploy latest
-#   bash deploy.sh --version 1.2.3   # deploy specific release
+#   bash deploy.sh                          # latest stable on jazzy (rolls forward on each release)
+#   bash deploy.sh --version jazzy-1.4.0    # pinned release
 
 set -euo pipefail
 
-ROBOT_VERSION="latest"
+ROBOT_VERSION="jazzy-latest"
 WEBAPP_VERSION="latest"
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --version)
+      # Robot images are distro-prefixed (e.g. jazzy-1.4.0). Webapp uses its own
+      # tag scheme and is not changed by --version; pass --webapp-version for it.
       ROBOT_VERSION="$2"
+      shift 2
+      ;;
+    --webapp-version)
       WEBAPP_VERSION="$2"
       shift 2
       ;;
     *)
       echo "Unknown argument: $1"
-      echo "Usage: bash deploy.sh [--version <semver>]"
+      echo "Usage: bash deploy.sh [--version <distro>-<semver>] [--webapp-version <tag>]"
       exit 1
       ;;
   esac

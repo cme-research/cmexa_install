@@ -5,7 +5,7 @@ on:
     branches:
       - jazzy
     tags:
-      - 'v*'
+      - 'jazzy-v*'
   workflow_dispatch:
 
 env:
@@ -46,8 +46,8 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.ORG }}/cmexa_${{ matrix.target }}
           tags: |
-            type=raw,value=jazzy
-            type=sha,prefix=jazzy-,format=long
+            type=raw,value=${{ github.ref_name }}
+            type=sha,prefix=${{ github.ref_name }}-,format=long
 
       - name: Build and push
         uses: docker/build-push-action@v6
@@ -82,31 +82,45 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Compute version tags
+      - name: Parse distro and version from tag
         id: ver
         run: |
-          v="${GITHUB_REF_NAME#v}"
-          echo "v=$v"                                 >> "$GITHUB_OUTPUT"
-          echo "minor=$(echo "$v" | cut -d. -f1-2)"   >> "$GITHUB_OUTPUT"
-          echo "major=$(echo "$v" | cut -d. -f1)"     >> "$GITHUB_OUTPUT"
-
-      - name: Retag jazzy-<sha> manifest as versioned release
-        env:
-          IMG: ${{ env.REGISTRY }}/${{ env.ORG }}/cmexa_${{ matrix.target }}
-          SHA: ${{ github.sha }}
-          V:   ${{ steps.ver.outputs.v }}
-          MIN: ${{ steps.ver.outputs.minor }}
-          MAJ: ${{ steps.ver.outputs.major }}
-        run: |
           set -euo pipefail
-          src="${IMG}:jazzy-${SHA}"
-          if ! docker buildx imagetools inspect "${src}" >/dev/null 2>&1; then
-            echo "::error::Source image ${src} not found. Tag a commit that has been merged to jazzy and built by the 'build' job."
+          # ref name format: <distro>-v<semver>, e.g. "jazzy-v1.4.0" or "jazzy-v1.4.0-rc1"
+          full="${GITHUB_REF_NAME}"
+          if [[ ! "$full" =~ ^([a-z]+)-v([0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?)$ ]]; then
+            echo "::error::Tag '${full}' does not match '<distro>-v<semver>' (e.g. jazzy-v1.4.0, jazzy-v1.4.0-rc1)."
             exit 1
           fi
-          args=(-t "${IMG}:${V}" -t "${IMG}:${MIN}" -t "${IMG}:${MAJ}")
-          # Only mark stable releases as 'latest' (skip pre-releases like v1.2.3-rc1).
-          if [[ "$V" != *-* ]]; then
-            args+=(-t "${IMG}:latest")
+          distro="${BASH_REMATCH[1]}"
+          v="${BASH_REMATCH[2]}"
+          echo "distro=${distro}"                        >> "$GITHUB_OUTPUT"
+          echo "v=${v}"                                  >> "$GITHUB_OUTPUT"
+          echo "minor=$(echo "${v}" | cut -d. -f1-2)"    >> "$GITHUB_OUTPUT"
+          echo "major=$(echo "${v}" | cut -d. -f1)"      >> "$GITHUB_OUTPUT"
+
+      - name: Retag <distro>-<sha> manifest as versioned release
+        env:
+          IMG:    ${{ env.REGISTRY }}/${{ env.ORG }}/cmexa_${{ matrix.target }}
+          SHA:    ${{ github.sha }}
+          DISTRO: ${{ steps.ver.outputs.distro }}
+          V:      ${{ steps.ver.outputs.v }}
+          MIN:    ${{ steps.ver.outputs.minor }}
+          MAJ:    ${{ steps.ver.outputs.major }}
+        run: |
+          set -euo pipefail
+          src="${IMG}:${DISTRO}-${SHA}"
+          if ! docker buildx imagetools inspect "${src}" >/dev/null 2>&1; then
+            echo "::error::Source image ${src} not found. Tag a commit that has been merged to '${DISTRO}' and built by the 'build' job."
+            exit 1
+          fi
+          args=(
+            -t "${IMG}:${DISTRO}-${V}"
+            -t "${IMG}:${DISTRO}-${MIN}"
+            -t "${IMG}:${DISTRO}-${MAJ}"
+          )
+          # Only mark stable releases as '<distro>-latest' (skip pre-releases like v1.4.0-rc1).
+          if [[ "${V}" != *-* ]]; then
+            args+=(-t "${IMG}:${DISTRO}-latest")
           fi
           docker buildx imagetools create "${args[@]}" "${src}"

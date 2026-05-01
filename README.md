@@ -108,26 +108,32 @@ docker compose -f docker-compose.prod.yml logs -f hardware
 
 ## CI/CD Pipeline
 
-Images are built once on merge to `jazzy` and **promoted** (retagged, not rebuilt) when you push a `v*` tag. Releases are byte-identical to what was tested on the merge commit, and tag-to-published is seconds, not minutes.
+Images are built once on merge to `jazzy` and **promoted** (retagged, not rebuilt) when you push a `jazzy-v*` tag. Releases are byte-identical to what was tested on the merge commit, and tag-to-published is seconds, not minutes.
 
 ### Branch model
 
 | Branch | Purpose | Protection |
 |---|---|---|
-| `jazzy_dev` | Active development. Push freely. | None |
-| `jazzy` | Stable. Direct pushes blocked. Merges only via PR from `jazzy_dev`, all CI checks must pass. | Ruleset *Protect jazzy* |
+| `jazzy_dev` | Active development on ROS Jazzy. Push freely. | None |
+| `jazzy` | Stable releases on ROS Jazzy. Direct pushes blocked. Merges only via PR from `jazzy_dev`, all CI checks must pass. | Ruleset *Protect jazzy* |
 
 PRs into `jazzy` from any branch other than `jazzy_dev` are rejected by the `verify-source` check.
 
+When the project moves to a new ROS distro, mirror the pattern: a `<distro>` branch with the same protection ruleset, a `<distro>_dev` working branch, and tag releases as `<distro>-v*`. The workflow already derives the distro from the branch and tag names.
+
 ### Versioning
+
+Every git tag and image tag is **prefixed with the ROS distro** so the underlying ROS version is unambiguous from the name alone.
 
 | Event | Tags produced on `cmexa_hardware` and `cmexa_nav` |
 |---|---|
 | Merge PR into `jazzy` | `:jazzy`, `:jazzy-<full-sha>` (built fresh, multi-arch) |
-| Push tag `v1.2.3` | `:1.2.3`, `:1.2`, `:1`, `:latest` (retagged from `:jazzy-<sha>`, no rebuild) |
-| Push tag `v1.2.3-rc1` | `:1.2.3-rc1`, `:1.2`, `:1` (no `:latest` for pre-releases) |
+| Push tag `jazzy-v1.4.0` | `:jazzy-1.4.0`, `:jazzy-1.4`, `:jazzy-1`, `:jazzy-latest` (retagged from `:jazzy-<sha>`, no rebuild) |
+| Push tag `jazzy-v1.4.0-rc1` | `:jazzy-1.4.0-rc1`, `:jazzy-1.4`, `:jazzy-1` (no `:jazzy-latest` for pre-releases) |
 
-The ROS base image is pinned by digest in both Dockerfiles, so upstream `ros:jazzy-ros-base-noble` updates can't shift a release. Bump the digest deliberately when you want to pull in upstream changes (see [Bumping the ROS base image](#bumping-the-ros-base-image) below).
+The git tag format `<distro>-v<semver>` is enforced by the `Promote` job — tags that don't match (e.g. plain `v1.4.0`) are rejected with an explicit error.
+
+The ROS base image itself is pinned by digest in both Dockerfiles, so upstream `ros:jazzy-ros-base-noble` updates can't shift a release. Bump the digest deliberately when you want to pull in upstream changes (see [Bumping the ROS base image](#bumping-the-ros-base-image) below).
 
 ### Releasing a new version — step by step
 
@@ -137,7 +143,7 @@ The ROS base image is pinned by digest in both Dockerfiles, so upstream `ros:jaz
 
 ```bash
 gh pr create --base jazzy --head jazzy_dev \
-  --title "Release v1.2.3" \
+  --title "Release jazzy-v1.4.0" \
   --body "Release notes here"
 ```
 
@@ -157,45 +163,54 @@ git checkout jazzy
 git pull
 ```
 
-**5. Tag and push.** Use [SemVer](https://semver.org). The tag must point to the merge commit produced in step 3:
+**5. Tag and push.** Tag format is `<distro>-v<semver>`. The tag must point to the merge commit produced in step 3:
 
 ```bash
-git tag -a v1.2.3 -m "Release v1.2.3"
-git push origin v1.2.3
+git tag -a jazzy-v1.4.0 -m "Release jazzy-v1.4.0"
+git push origin jazzy-v1.4.0
 ```
 
-**6. Promotion runs automatically** (~10–30 s). Watch the `Promote` job in `Actions`. It retags the existing `:jazzy-<sha>` manifest as `:1.2.3`, `:1.2`, `:1`, and `:latest`.
+**6. Promotion runs automatically** (~10–30 s). Watch the `Promote` job in `Actions`. It retags the existing `:jazzy-<sha>` manifest as `:jazzy-1.4.0`, `:jazzy-1.4`, `:jazzy-1`, and `:jazzy-latest`.
 
 **7. Deploy on the robot.** SSH to the Pi:
 
 ```bash
 cd ~/cmexa_install
 git pull
-bash deploy.sh --version 1.2.3
+bash deploy.sh --version jazzy-1.4.0
 ```
 
-This writes `IMAGE_TAG=1.2.3` to `.env`, pulls the pinned images, and restarts services.
+This writes `ROBOT_VERSION=jazzy-1.4.0` to `.env`, pulls the pinned images, and restarts services. Without `--version`, `deploy.sh` defaults to `:jazzy-latest` (the most recent stable release on jazzy) — never the rolling `:jazzy` build.
 
 **8. Create a GitHub release** (optional but recommended) — generates release notes and pins documentation to the tag:
 
 ```bash
-gh release create v1.2.3 --generate-notes
+gh release create jazzy-v1.4.0 --generate-notes
 ```
 
 ### Pre-releases
 
-For release candidates and beta builds, use a pre-release suffix. They get version tags but **not** `:latest`, so `deploy.sh` (which defaults to `:latest`) won't pick them up unless you pass `--version` explicitly.
+For release candidates and beta builds, use a pre-release suffix. They get version tags but **not** `:jazzy-latest`, so `deploy.sh` (which defaults to `:jazzy-latest`) won't pick them up unless you pass `--version` explicitly.
 
 ```bash
-git tag -a v1.2.3-rc1 -m "Release candidate"
-git push origin v1.2.3-rc1
+git tag -a jazzy-v1.4.0-rc1 -m "Release candidate"
+git push origin jazzy-v1.4.0-rc1
 # On robot:
-bash deploy.sh --version 1.2.3-rc1
+bash deploy.sh --version jazzy-1.4.0-rc1
 ```
 
 ### Hotfixing a released version
 
-Tags are immutable. To publish a fix, open a new PR from `jazzy_dev` → `jazzy`, merge, and tag the new merge commit as `v1.2.4`.
+Tags are immutable. To publish a fix, open a new PR from `jazzy_dev` → `jazzy`, merge, and tag the new merge commit as `jazzy-v1.4.1`.
+
+### Why distro-prefixed tags?
+
+ROS releases are tied to a specific distro and the ABI is not portable across distros. Encoding the distro in every git tag and image tag means:
+
+- A tag like `jazzy-v1.4.0` is self-describing — no need to look up which branch it lives on or read release notes to know which ROS distro it targets.
+- `git tag --list 'jazzy-*'` lists all releases on a given distro.
+- Two distros can be maintained in parallel: `jazzy-v1.4.1` (security fix on the old LTS) and `kilted-v2.0.0` (next-distro feature release) can ship the same week without tag conflicts.
+- Image tags `cmexa_hardware:jazzy-1.4.0` make it impossible to accidentally deploy a `kilted` image where a `jazzy` one was expected.
 
 ### Bumping the ROS base image
 
