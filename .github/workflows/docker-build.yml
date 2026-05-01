@@ -1,11 +1,11 @@
-name: Docker Multi-Arch Build
+name: Docker Multi-Arch Build & Release
 
 on:
   push:
     branches:
       - jazzy
     tags:
-      - 'v*'
+      - 'jazzy-v*'
   workflow_dispatch:
 
 env:
@@ -13,13 +13,17 @@ env:
   ORG: cme-research
 
 jobs:
-  build-hardware:
-    name: Build hardware image
+  build:
+    if: github.ref_type == 'branch'
+    name: Build ${{ matrix.target }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
-
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [hardware, nav]
     steps:
       - uses: actions/checkout@v4
 
@@ -40,40 +44,34 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.ORG }}/cmexa_hardware
+          images: ${{ env.REGISTRY }}/${{ env.ORG }}/cmexa_${{ matrix.target }}
           tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=semver,pattern={{major}}
-            type=ref,event=branch
-          flavor: |
-            latest=auto
+            type=raw,value=${{ github.ref_name }}
+            type=sha,prefix=${{ github.ref_name }}-,format=long
 
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
           context: ./docker
-          file: ./docker/Dockerfile.hardware
+          file: ./docker/Dockerfile.${{ matrix.target }}
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha,scope=hardware
-          cache-to: type=gha,mode=max,scope=hardware
+          cache-from: type=gha,scope=${{ matrix.target }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.target }}
 
-  build-nav:
-    name: Build nav image
+  promote:
+    if: github.ref_type == 'tag'
+    name: Promote ${{ matrix.target }} to ${{ github.ref_name }}
     runs-on: ubuntu-latest
     permissions:
-      contents: read
       packages: write
-
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [hardware, nav]
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
       - name: Set up Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -84,27 +82,45 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.ORG }}/cmexa_nav
-          tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=semver,pattern={{major}}
-            type=ref,event=branch
-          flavor: |
-            latest=auto
+      - name: Parse distro and version from tag
+        id: ver
+        run: |
+          set -euo pipefail
+          # ref name format: <distro>-v<semver>, e.g. "jazzy-v1.4.0" or "jazzy-v1.4.0-rc1"
+          full="${GITHUB_REF_NAME}"
+          if [[ ! "$full" =~ ^([a-z]+)-v([0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?)$ ]]; then
+            echo "::error::Tag '${full}' does not match '<distro>-v<semver>' (e.g. jazzy-v1.4.0, jazzy-v1.4.0-rc1)."
+            exit 1
+          fi
+          distro="${BASH_REMATCH[1]}"
+          v="${BASH_REMATCH[2]}"
+          echo "distro=${distro}"                        >> "$GITHUB_OUTPUT"
+          echo "v=${v}"                                  >> "$GITHUB_OUTPUT"
+          echo "minor=$(echo "${v}" | cut -d. -f1-2)"    >> "$GITHUB_OUTPUT"
+          echo "major=$(echo "${v}" | cut -d. -f1)"      >> "$GITHUB_OUTPUT"
 
-      - name: Build and push
-        uses: docker/build-push-action@v6
-        with:
-          context: ./docker
-          file: ./docker/Dockerfile.nav
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha,scope=nav
-          cache-to: type=gha,mode=max,scope=nav
+      - name: Retag <distro>-<sha> manifest as versioned release
+        env:
+          IMG:    ${{ env.REGISTRY }}/${{ env.ORG }}/cmexa_${{ matrix.target }}
+          SHA:    ${{ github.sha }}
+          DISTRO: ${{ steps.ver.outputs.distro }}
+          V:      ${{ steps.ver.outputs.v }}
+          MIN:    ${{ steps.ver.outputs.minor }}
+          MAJ:    ${{ steps.ver.outputs.major }}
+        run: |
+          set -euo pipefail
+          src="${IMG}:${DISTRO}-${SHA}"
+          if ! docker buildx imagetools inspect "${src}" >/dev/null 2>&1; then
+            echo "::error::Source image ${src} not found. Tag a commit that has been merged to '${DISTRO}' and built by the 'build' job."
+            exit 1
+          fi
+          args=(
+            -t "${IMG}:${DISTRO}-${V}"
+            -t "${IMG}:${DISTRO}-${MIN}"
+            -t "${IMG}:${DISTRO}-${MAJ}"
+          )
+          # Only mark stable releases as '<distro>-latest' (skip pre-releases like v1.4.0-rc1).
+          if [[ "${V}" != *-* ]]; then
+            args+=(-t "${IMG}:${DISTRO}-latest")
+          fi
+          docker buildx imagetools create "${args[@]}" "${src}"

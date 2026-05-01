@@ -1,4 +1,4 @@
-FROM ros:jazzy-ros-base-noble
+FROM ros:jazzy-ros-base-noble@sha256:e9b9b98c1a867673789dfa1cb622b780e1ae6e5a0c235b0340d83c2b46f6171c
 
 LABEL maintainer="Christian Ehrmann"
 LABEL version="1.0"
