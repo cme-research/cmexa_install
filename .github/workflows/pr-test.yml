@@ -1,0 +1,70 @@
+name: PR Test
+
+on:
+  pull_request:
+    branches:
+      - jazzy
+      - jazzy_dev
+
+jobs:
+  colcon-build:
+    name: colcon build
+    runs-on: ubuntu-latest
+    container:
+      image: ros:jazzy-ros-base-noble
+    steps:
+      - name: Install build tooling
+        run: |
+          apt-get update
+          apt-get install --no-install-recommends -y \
+            build-essential git \
+            python3-colcon-common-extensions \
+            python3-rosdep python3-vcstool
+
+      - name: Checkout cmexa_install (PR head)
+        uses: actions/checkout@v4
+        with:
+          path: src/cmexa_install
+
+      - name: vcs import sources
+        run: |
+          vcs import src < src/cmexa_install/cmexa_robot.repos
+
+      - name: rosdep install
+        shell: bash
+        run: |
+          rosdep update
+          rosdep install -y -r --from-paths src --ignore-src --rosdistro=jazzy \
+            --skip-keys "nav2_bringup slam_toolbox rviz2 web_video_server"
+
+      - name: colcon build
+        shell: bash
+        run: |
+          source /opt/ros/jazzy/setup.bash
+          colcon build --event-handlers console_cohesion+
+
+  docker-build:
+    name: docker multi-arch (no push)
+    needs: colcon-build
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [hardware, nav]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build (no push)
+        uses: docker/build-push-action@v6
+        with:
+          context: ./docker
+          file: ./docker/Dockerfile.${{ matrix.target }}
+          platforms: linux/amd64,linux/arm64
+          push: false
+          cache-from: type=gha,scope=${{ matrix.target }}
