@@ -55,17 +55,6 @@ update_env() {
 update_env "ROBOT_VERSION" "${ROBOT_VERSION}"
 update_env "WEBAPP_VERSION" "${WEBAPP_VERSION}"
 
-# Login check — prompt if not already authenticated
-if ! docker system info 2>/dev/null | grep -q "ghcr.io"; then
-  if [ -z "${GHCR_TOKEN:-}" ]; then
-    echo "==> Not logged in to ghcr.io."
-    echo "    Set GHCR_TOKEN env var or enter a GitHub PAT with read:packages scope:"
-    read -r -s -p "    PAT: " GHCR_TOKEN
-    echo
-  fi
-  echo "${GHCR_TOKEN}" | docker login ghcr.io -u cme-research --password-stdin
-fi
-
 echo "==> Pulling images..."
 ROBOT_VERSION="${ROBOT_VERSION}" WEBAPP_VERSION="${WEBAPP_VERSION}" \
   docker compose -f "${COMPOSE_FILE}" pull
