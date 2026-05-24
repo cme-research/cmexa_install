@@ -10,10 +10,12 @@ jobs:
     name: verify-source
     runs-on: ubuntu-latest
     steps:
-      - name: Require head ref to be jazzy_dev
+      - name: Require head ref to be jazzy_dev or a release-please branch
         run: |
-          if [[ "${{ github.head_ref }}" != "jazzy_dev" ]]; then
-            echo "::error::PRs into 'jazzy' must originate from 'jazzy_dev' (got '${{ github.head_ref }}')."
-            exit 1
+          head="${{ github.head_ref }}"
+          if [[ "$head" == "jazzy_dev" || "$head" == release-please--* ]]; then
+            echo "Source branch '$head' is allowed — OK."
+            exit 0
           fi
-          echo "Source branch is 'jazzy_dev' — OK."
+          echo "::error::PRs into 'jazzy' must originate from 'jazzy_dev' or a release-please branch (got '$head')."
+          exit 1
