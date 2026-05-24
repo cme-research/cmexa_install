@@ -1,0 +1,40 @@
+# Release-please workflow.
+#
+# Runs on every push to `jazzy`. Two modes per run:
+#   1. Conventional commits since last release → opens/updates a "release PR"
+#      that bumps `.release-please-manifest.json` and writes CHANGELOG.md.
+#   2. The release PR was just merged → release-please creates the git tag
+#      `jazzy-v<semver>` and a GitHub Release with the CHANGELOG section as
+#      release notes.
+#
+# The new tag then triggers `docker-build.yml` (filter `jazzy-v*`), whose
+# `promote` job retags the GHCR images to `jazzy-<semver>` / `jazzy-<minor>`
+# / `jazzy-<major>` / `jazzy-latest`.
+#
+# Required repository secret:
+#   RELEASE_PLEASE_TOKEN — fine-grained PAT with `contents:write` and
+#   `pull-requests:write` on this repo. A `GITHUB_TOKEN`-pushed tag does not
+#   trigger downstream workflows (docker-build.yml), so the PAT is required
+#   for the promote job to fire on the new tag.
+
+name: Release Please
+
+on:
+  push:
+    branches: [jazzy]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: googleapis/release-please-action@v5
+        with:
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+          target-branch: jazzy
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
