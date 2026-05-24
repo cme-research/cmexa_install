@@ -1,5 +1,8 @@
 # cmexa_install
 
+[![Release](https://img.shields.io/github/v/release/cme-research/cmexa_install?label=release)](https://github.com/cme-research/cmexa_install/releases)
+[![Docker Build](https://github.com/cme-research/cmexa_install/actions/workflows/docker-build.yml/badge.svg?branch=jazzy)](https://github.com/cme-research/cmexa_install/actions/workflows/docker-build.yml)
+
 Deploy and infrastructure repo for the CMEXAIII robot stack. Contains Docker Compose files, Dockerfiles, and the CI/CD pipeline for building and deploying multi-arch images.
 
 ---
