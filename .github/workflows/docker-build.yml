@@ -130,33 +130,3 @@ jobs:
             args+=(-t "${IMG}:${DISTRO}-latest")
           fi
           docker buildx imagetools create "${args[@]}" "${src}"
-
-  release:
-    if: github.ref_type == 'tag'
-    name: Create GitHub Release
-    runs-on: ubuntu-latest
-    needs: promote
-    permissions:
-      contents: write
-    steps:
-      - name: Detect pre-release
-        id: pre
-        run: |
-          set -euo pipefail
-          # Pre-release iff the semver portion has a "-suffix" (e.g. jazzy-v1.4.0-rc1).
-          # Tag shape is enforced by the promote job — assume <distro>-v<semver>.
-          v="${GITHUB_REF_NAME#*-v}"
-          if [[ "${v}" == *-* ]]; then
-            echo "prerelease=true"  >> "$GITHUB_OUTPUT"
-            echo "make_latest=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "prerelease=false" >> "$GITHUB_OUTPUT"
-            echo "make_latest=true"  >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Create release
-        uses: softprops/action-gh-release@v3
-        with:
-          generate_release_notes: true
-          prerelease: ${{ steps.pre.outputs.prerelease }}
-          make_latest: ${{ steps.pre.outputs.make_latest }}
