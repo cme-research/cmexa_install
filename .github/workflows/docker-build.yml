@@ -23,7 +23,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target: [hardware, nav]
+        target: [hardware, nav, brickd]
     steps:
       - uses: actions/checkout@v4
 
@@ -77,7 +77,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target: [hardware, nav]
+        target: [hardware, nav, brickd]
     steps:
       - name: Set up Buildx
         uses: docker/setup-buildx-action@v3
