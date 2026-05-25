@@ -50,21 +50,15 @@ mosquitto → webapp + brickd → hardware → nav
 ### Prerequisites
 
 - Docker with Compose plugin
-- GitHub Personal Access Token (PAT) with `read:packages` scope for pulling from `ghcr.io`
 
-Store the PAT on the Pi to avoid being prompted on every deploy:
-
-```bash
-export GHCR_TOKEN=your_pat_here
-# Add to ~/.bashrc to persist across reboots
-```
+All `ghcr.io/cme-research/...` images used here are **public** — no PAT or `docker login` required.
 
 ### First deploy on a fresh host
 
 ```bash
 git clone git@github.com:cme-research/cmexa_install.git
 cd cmexa_install
-bash deploy.sh
+bash deploy.sh --version jazzy-latest
 ```
 
 `deploy.sh` runs `setup.sh` automatically if no `.env` exists yet.
@@ -72,10 +66,10 @@ bash deploy.sh
 ### Deploy a specific release
 
 ```bash
-bash deploy.sh --version 1.2.3
+bash deploy.sh --version jazzy-0.1.1
 ```
 
-This pulls `ghcr.io/cme-research/cmexa_hardware:1.2.3` and `cmexa_nav:1.2.3`, writes the version into `.env`, and starts all services.
+This pulls `ghcr.io/cme-research/cmexa_hardware:jazzy-0.1.1`, `cmexa_nav:jazzy-0.1.1`, and `cmeresearch_amr_webcontrol:jazzy-0.1.1`, writes the version into `.env`, and starts all services. See `bash deploy.sh --help` for the full accepted version syntax.
 
 ### Update to latest
 
