@@ -61,6 +61,12 @@ services:
     environment:
       - ROBOT=cmexaiii
       - ROBOT_ENV=house
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f ros2_control_node >/dev/null && pgrep -f robot_state_publisher >/dev/null"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
 
   nav:
     image: ghcr.io/cme-research/cmexa_nav:${ROBOT_VERSION:?ROBOT_VERSION must be set (e.g. jazzy-0.1.0); run deploy.sh --version <distro>-<semver>}
@@ -70,7 +76,7 @@ services:
     ipc: host
     depends_on:
       hardware:
-        condition: service_started
+        condition: service_healthy
     command: ros2 launch cmeresearch_bringup ${LAUNCH_FILE:-cmexaiii_nav_mapping.launch.py}
     volumes:
       - /robot/data/maps:/maps
