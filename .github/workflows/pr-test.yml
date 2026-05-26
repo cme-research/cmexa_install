@@ -55,7 +55,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target: [hardware, nav]
+        target: [hardware, nav, brickd]
     steps:
       - uses: actions/checkout@v4
 

@@ -30,7 +30,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
 
   brickd:
-    image: cmeresearch/brickd:1.0
+    image: ghcr.io/cme-research/cmexa_brickd:${ROBOT_VERSION:?ROBOT_VERSION must be set (e.g. jazzy-0.1.0); run deploy.sh --version <distro>-<semver>}
     container_name: cmexa-brickd
     restart: unless-stopped
     network_mode: host

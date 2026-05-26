@@ -1,0 +1,23 @@
+FROM debian:bookworm-slim
+
+LABEL maintainer="Christian Ehrmann"
+LABEL description="TinkerForge Brick Daemon — exposes USB-connected bricks on TCP 4223"
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install brickd from the official TinkerForge APT repo (supports amd64 + arm64).
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        ca-certificates wget \
+    && wget -q -O - "https://download.tinkerforge.com/apt/$(. /etc/os-release; echo "$ID")/tinkerforge.gpg" \
+       | tee /etc/apt/trusted.gpg.d/tinkerforge.gpg > /dev/null \
+    && echo "deb https://download.tinkerforge.com/apt/$(. /etc/os-release; echo "$ID $VERSION_CODENAME") main" \
+       > /etc/apt/sources.list.d/tinkerforge.list \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends brickd \
+    && apt-get purge -y --auto-remove wget \
+    && rm -rf /var/lib/apt/lists/*
+
+EXPOSE 4223
+# brickd runs in foreground when --daemon is omitted.
+ENTRYPOINT ["/usr/bin/brickd"]
+CMD []
