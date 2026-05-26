@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.3.0](https://github.com/cme-research/cmexa_install/compare/jazzy-v0.2.0...jazzy-v0.3.0) (2026-05-26)
+
+
+### Neue Features
+
+* **compose:** gate nav on hardware healthcheck ([b5dccdd](https://github.com/cme-research/cmexa_install/commit/b5dccdd3eb05b18b221a9373b71efb315d3273c9))
+* **compose:** gate nav startup on hardware healthcheck ([a115c91](https://github.com/cme-research/cmexa_install/commit/a115c91fe2c9d3c0987cb1ceb442cc11fef01a74))
+
+
+### Bug Fixes
+
+* **docker:** clone source repos from jazzy_dev to match cmexa_robot.repos ([b5a8199](https://github.com/cme-research/cmexa_install/commit/b5a819982a60cfedeb95919063ebd74836efe775))
+
 ## [0.2.0](https://github.com/cme-research/cmexa_install/compare/jazzy-v0.1.1...jazzy-v0.2.0) (2026-05-26)
 
 
