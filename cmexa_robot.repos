@@ -2,39 +2,39 @@ repositories:
   cmeresearch_bringup:
     type: git
     url: https://github.com/cme-research/cmeresearch_bringup.git
-    version: jazzy_dev
+    version: jazzy
   cmeresearch_description:
     type: git
     url: https://github.com/cme-research/cmeresearch_description.git
-    version: jazzy_dev
+    version: jazzy
   cmeresearch_environments:
     type: git
     url: https://github.com/cme-research/cmeresearch_environments.git
-    version: jazzy_dev
+    version: jazzy
   cmeresearch_msgs:
     type: git
     url: https://github.com/cme-research/cmeresearch_msgs.git
-    version: jazzy_dev
+    version: jazzy
   cmeresearch_stepper_driver:
     type: git
     url: https://github.com/cme-research/cmeresearch_stepper_driver.git
-    version: jazzy_dev
+    version: jazzy
   cmexa_base:
     type: git
     url: https://github.com/cme-research/cmexa_base.git
-    version: jazzy_dev
+    version: jazzy
   joy2twist:
     type: git
     url: https://github.com/cme-research/joy2twist.git
-    version: jazzy_dev
+    version: jazzy
   ldlidar_stl_ros2:
     type: git
     url: https://github.com/cme-research/ldlidar_stl_ros2.git
-    version: jazzy_dev
+    version: jazzy
   mqtt_bridge:
     type: git
     url: https://github.com/cme-research/mqtt_bridge.git
-    version: jazzy_dev
+    version: jazzy
   dual_laser_merger:
     type: git
     url: https://github.com/cme-research/dual_laser_merger.git
@@ -42,4 +42,4 @@ repositories:
   cmeresearch_amr_webcontrol:
     type: git
     url: https://github.com/cme-research/cmeresearch_amr_webcontrol.git
-    version: jazzy_dev
+    version: jazzy

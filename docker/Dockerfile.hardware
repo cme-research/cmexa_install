@@ -42,6 +42,20 @@ RUN apt-get update \
 ENV PIP_BREAK_SYSTEM_PACKAGES=1
 ENV CATKIN_WS=/robot/ros2_ws
 
+# Cache-bust the git clones below: each ADD layer's content is the upstream
+# branch's commit JSON, so the layer (and everything downstream) invalidates
+# automatically when any source repo's jazzy HEAD moves. Without this Docker
+# happily serves stale `git clone` results across builds.
+ADD https://api.github.com/repos/cme-research/cmeresearch_bringup/branches/jazzy        /tmp/.rev-bringup
+ADD https://api.github.com/repos/cme-research/cmeresearch_description/branches/jazzy    /tmp/.rev-description
+ADD https://api.github.com/repos/cme-research/cmeresearch_msgs/branches/jazzy           /tmp/.rev-msgs
+ADD https://api.github.com/repos/cme-research/cmexa_base/branches/jazzy                 /tmp/.rev-cmexa_base
+ADD https://api.github.com/repos/cme-research/cmeresearch_stepper_driver/branches/jazzy /tmp/.rev-stepper
+ADD https://api.github.com/repos/cme-research/mqtt_bridge/branches/jazzy                /tmp/.rev-mqtt_bridge
+ADD https://api.github.com/repos/cme-research/joy2twist/branches/jazzy                  /tmp/.rev-joy2twist
+ADD https://api.github.com/repos/cme-research/ldlidar_stl_ros2/branches/jazzy           /tmp/.rev-ldlidar
+ADD https://api.github.com/repos/cme-research/dual_laser_merger/branches/jazzy          /tmp/.rev-dual_laser_merger
+
 # Clone hardware packages from GitHub
 RUN mkdir -p /robot/ros2_ws/src \
     && cd /robot/ros2_ws/src \
