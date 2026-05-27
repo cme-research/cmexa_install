@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.4.0](https://github.com/cme-research/cmexa_install/compare/jazzy-v0.3.0...jazzy-v0.4.0) (2026-05-27)
+
+
+### Neue Features
+
+* **deploy:** make nav stack optional via --nav flag ([58d364b](https://github.com/cme-research/cmexa_install/commit/58d364b5e730ccdd6a507be162ed45a2839cedb4))
+
+
+### Bug Fixes
+
+* **docker:** add localhost peer to cyclonedds config ([b86c454](https://github.com/cme-research/cmexa_install/commit/b86c45466549ca87d603006f2d2e3558f7b0b7e6))
+
 ## [0.3.0](https://github.com/cme-research/cmexa_install/compare/jazzy-v0.2.0...jazzy-v0.3.0) (2026-05-26)
 
 
