@@ -25,12 +25,16 @@ VERSION_REGEX='^[a-z]+-(latest|[0-9]+(\.[0-9]+){0,2}(-[0-9A-Za-z.-]+)?|[0-9a-f]{
 
 usage() {
   cat <<EOF
-Usage: bash deploy.sh --version <distro>-<tag> [--webapp-version <distro>-<tag>]
+Usage: bash deploy.sh --version <distro>-<tag> [--webapp-version <distro>-<tag>] [--nav]
+
+By default this deploys mosquitto, webapp, brickd and hardware only.
+Pass --nav to additionally start the navigation container.
 
 Examples:
-  bash deploy.sh --version jazzy-0.1.0
-  bash deploy.sh --version jazzy-latest
-  bash deploy.sh --version jazzy-0.1.0 --webapp-version jazzy-0.2.0
+  bash deploy.sh --version jazzy-0.1.0                # hardware stack only
+  bash deploy.sh --version jazzy-0.1.0 --nav          # hardware + nav
+  bash deploy.sh --version jazzy-latest --nav
+  bash deploy.sh --version jazzy-0.1.0 --webapp-version jazzy-0.2.0 --nav
 
 Versions must match: ${VERSION_REGEX}
 EOF
@@ -59,6 +63,7 @@ ROBOT_VERSION=""
 WEBAPP_VERSION=""
 ROBOT_VERSION_SET=false
 WEBAPP_VERSION_SET=false
+USE_NAV=false
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -71,6 +76,10 @@ while [[ $# -gt 0 ]]; do
       WEBAPP_VERSION="${2:-}"
       WEBAPP_VERSION_SET=true
       shift 2
+      ;;
+    --nav)
+      USE_NAV=true
+      shift
       ;;
     -h|--help)
       usage
@@ -115,7 +124,15 @@ validate_version "WEBAPP_VERSION" "$WEBAPP_VERSION"
 
 COMPOSE_FILE="docker-compose.prod.yml"
 
-echo "==> Deploying CMEXAIII stack (robot: ${ROBOT_VERSION}, webapp: ${WEBAPP_VERSION})"
+PROFILE_ARGS=()
+if $USE_NAV; then
+  PROFILE_ARGS+=("--profile" "nav")
+  NAV_LABEL="enabled"
+else
+  NAV_LABEL="disabled"
+fi
+
+echo "==> Deploying CMEXAIII stack (robot: ${ROBOT_VERSION}, webapp: ${WEBAPP_VERSION}, nav: ${NAV_LABEL})"
 
 # Write version overrides into .env (replace or append)
 update_env() {
@@ -131,14 +148,24 @@ update_env() {
 update_env "ROBOT_VERSION" "${ROBOT_VERSION}"
 update_env "WEBAPP_VERSION" "${WEBAPP_VERSION}"
 
+# If --nav is NOT set, stop any previously running nav container so we don't
+# leave a stale one behind from an earlier full deploy.
+if ! $USE_NAV; then
+  if docker ps -a --format '{{.Names}}' | grep -qx cmexaiii-nav; then
+    echo "==> --nav not set: stopping leftover nav container..."
+    docker compose -f "${COMPOSE_FILE}" --profile nav stop nav 2>/dev/null || true
+    docker compose -f "${COMPOSE_FILE}" --profile nav rm -f nav 2>/dev/null || true
+  fi
+fi
+
 echo "==> Pulling images..."
 ROBOT_VERSION="${ROBOT_VERSION}" WEBAPP_VERSION="${WEBAPP_VERSION}" \
-  docker compose -f "${COMPOSE_FILE}" pull
+  docker compose -f "${COMPOSE_FILE}" "${PROFILE_ARGS[@]}" pull
 
 echo "==> Starting services..."
 ROBOT_VERSION="${ROBOT_VERSION}" WEBAPP_VERSION="${WEBAPP_VERSION}" \
-  docker compose -f "${COMPOSE_FILE}" up -d
+  docker compose -f "${COMPOSE_FILE}" "${PROFILE_ARGS[@]}" up -d
 
 echo ""
 echo "==> Done. Running services:"
-docker compose -f "${COMPOSE_FILE}" ps
+docker compose -f "${COMPOSE_FILE}" "${PROFILE_ARGS[@]}" ps

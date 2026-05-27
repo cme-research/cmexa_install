@@ -74,6 +74,7 @@ services:
     restart: unless-stopped
     network_mode: host
     ipc: host
+    profiles: ["nav"]
     depends_on:
       hardware:
         condition: service_healthy
