@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.4.1](https://github.com/cme-research/cmexa_install/compare/jazzy-v0.4.0...jazzy-v0.4.1) (2026-05-27)
+
+
+### Bug Fixes
+
+* **docker:** auto-invalidate cache when source repo HEAD moves ([a9fdfa8](https://github.com/cme-research/cmexa_install/commit/a9fdfa86874fc196652727e47b9d085aa1acda2c))
+* **docker:** auto-invalidate cache when source repo HEAD moves ([6bb3454](https://github.com/cme-research/cmexa_install/commit/6bb3454ed05ad2c697a5c3c1d85e8a5db0ca36b9))
+
 ## [0.4.0](https://github.com/cme-research/cmexa_install/compare/jazzy-v0.3.0...jazzy-v0.4.0) (2026-05-27)
 
 
