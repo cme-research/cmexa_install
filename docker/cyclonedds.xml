@@ -7,6 +7,12 @@
 
     <Discovery>
       <Peers>
+        <!-- Same-host discovery: required because AllowMulticast=false. Without
+             this, two participants in the same container (e.g. robot_state_publisher
+             and ros2_control_node) can't discover each other when none of the
+             host's interface IPs happens to match one of the peers below. -->
+        <Peer address="localhost"/>
+
         <!-- Docker host -->
         <Peer address="192.168.1.202"/>
 
