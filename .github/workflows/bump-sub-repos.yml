@@ -1,0 +1,39 @@
+name: Bump sub-repo SHAs
+
+on:
+  schedule:
+    # Hourly at *:17 to avoid GitHub-cron rush hour. Adjust as you like.
+    - cron: '17 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: bump-sub-repos
+  cancel-in-progress: false
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout jazzy_dev
+        uses: actions/checkout@v4
+        with:
+          ref: jazzy_dev
+          # PAT (not GITHUB_TOKEN) so the PRs opened here can trigger downstream
+          # workflows like pr-test and release-please.
+          token: ${{ secrets.BUMP_PAT }}
+          fetch-depth: 0
+
+      - name: Install PyYAML
+        run: python3 -m pip install --quiet pyyaml
+
+      - name: Detect drift and open PRs
+        env:
+          GH_TOKEN: ${{ secrets.BUMP_PAT }}
+          # Committer identity (author overridden in the script via --author).
+          GIT_COMMITTER_NAME: cme-research
+          GIT_COMMITTER_EMAIL: 39484176+cme-research@users.noreply.github.com
+        run: python3 scripts/bump-sub-repos.py
