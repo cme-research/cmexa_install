@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.5.0](https://github.com/cme-research/cmexa_install/compare/jazzy-v0.4.1...jazzy-v0.5.0) (2026-05-29)
+
+
+### Neue Features
+
+* **build:** pin sub-repo versions via SHA and consume through vcs import ([07221c1](https://github.com/cme-research/cmexa_install/commit/07221c19e8902928a7ee1e0c078b6367d0eea32e))
+* **build:** pin sub-repo versions via SHA and consume through vcs import ([16a6f9d](https://github.com/cme-research/cmexa_install/commit/16a6f9df54df1d2317f7d523a4abc3fc32405e0d))
+* **ci:** auto-bump sub-repo SHAs and open one PR per drifted repo ([39e2969](https://github.com/cme-research/cmexa_install/commit/39e296952376fe1965b76eef1d942bd6bc53731e))
+* **ci:** auto-bump sub-repo SHAs and open one PR per drifted repo ([46f9a29](https://github.com/cme-research/cmexa_install/commit/46f9a2966f44b52b9e40fca17377df3aec591639))
+
 ## [0.4.1](https://github.com/cme-research/cmexa_install/compare/jazzy-v0.4.0...jazzy-v0.4.1) (2026-05-27)
 
 
