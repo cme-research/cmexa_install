@@ -24,16 +24,35 @@ jobs:
             build-essential git \
             python3-colcon-common-extensions \
             python3-rosdep python3-vcstool \
-            python3-pip
+            python3-pip python3-yaml
 
       - name: Checkout cmexa_install (PR head)
         uses: actions/checkout@v4
         with:
           path: src/cmexa_install
 
+      - name: Merge docker/*.repos into one import file
+        # Build a single .repos that unions hardware.repos + nav.repos so the
+        # PR build exercises the exact SHAs that will land in the production
+        # images. Overlapping entries (cmeresearch_bringup, cmeresearch_msgs)
+        # are deduplicated; SHA-mismatch between files fails the job loudly.
+        run: |
+          python3 <<'PY'
+          import yaml, sys
+          out = {"repositories": {}}
+          for path in ["src/cmexa_install/docker/hardware.repos",
+                       "src/cmexa_install/docker/nav.repos"]:
+              data = yaml.safe_load(open(path)) or {}
+              for name, meta in (data.get("repositories") or {}).items():
+                  if name in out["repositories"] and out["repositories"][name] != meta:
+                      sys.exit(f"SHA mismatch for {name} between docker/*.repos files")
+                  out["repositories"][name] = meta
+          yaml.safe_dump(out, open("/tmp/merged.repos", "w"), sort_keys=False)
+          PY
+
       - name: vcs import sources
         run: |
-          vcs import src < src/cmexa_install/cmexa_robot.repos
+          vcs import src < /tmp/merged.repos
 
       - name: rosdep install
         shell: bash
