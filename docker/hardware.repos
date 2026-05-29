@@ -7,10 +7,6 @@ repositories:
     type: git
     url: https://github.com/cme-research/cmeresearch_description.git
     version: 9421930f92794716a1a211be10178f97cd4c89de
-  cmeresearch_environments:
-    type: git
-    url: https://github.com/cme-research/cmeresearch_environments.git
-    version: 5a32a699ace8125d72eecabd8dcbc203d0557794
   cmeresearch_msgs:
     type: git
     url: https://github.com/cme-research/cmeresearch_msgs.git
@@ -39,7 +35,3 @@ repositories:
     type: git
     url: https://github.com/cme-research/dual_laser_merger.git
     version: 44ccdcf30ec82fe5cca27f4b996eb81b2232c4ab
-  cmeresearch_amr_webcontrol:
-    type: git
-    url: https://github.com/cme-research/cmeresearch_amr_webcontrol.git
-    version: a7e90021744d7dc3e091c19e33f66a5533e1718e
