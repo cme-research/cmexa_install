@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.5.1](https://github.com/cme-research/cmexa_install/compare/jazzy-v0.5.0...jazzy-v0.5.1) (2026-05-29)
+
+
+### Bug Fixes
+
+* **mosquitto:** bind listener to all interfaces, not just loopback ([70096e3](https://github.com/cme-research/cmexa_install/commit/70096e3140ed022e53026d7e01af7b2bead02d0e))
+* **mosquitto:** bind listener to all interfaces, not just loopback ([bc84014](https://github.com/cme-research/cmexa_install/commit/bc8401468fd80d212b975ef1123920057fc0f619))
+
 ## [0.5.0](https://github.com/cme-research/cmexa_install/compare/jazzy-v0.4.1...jazzy-v0.5.0) (2026-05-29)
 
 
