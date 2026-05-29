@@ -1,0 +1,37 @@
+repositories:
+  cmeresearch_bringup:
+    type: git
+    url: https://github.com/cme-research/cmeresearch_bringup.git
+    version: 944d2dd35993ea6c2014c51888a4d4d370771c1a
+  cmeresearch_description:
+    type: git
+    url: https://github.com/cme-research/cmeresearch_description.git
+    version: 9421930f92794716a1a211be10178f97cd4c89de
+  cmeresearch_msgs:
+    type: git
+    url: https://github.com/cme-research/cmeresearch_msgs.git
+    version: 023d3e8051baacc178e52674e76ac30cd8d67569
+  cmeresearch_stepper_driver:
+    type: git
+    url: https://github.com/cme-research/cmeresearch_stepper_driver.git
+    version: 9d39b2c24b66c34b4927ba863370fe0f3f1317b8
+  cmexa_base:
+    type: git
+    url: https://github.com/cme-research/cmexa_base.git
+    version: 6c39f5573b9a5b4c8a44840004e96723bc5c5550
+  joy2twist:
+    type: git
+    url: https://github.com/cme-research/joy2twist.git
+    version: 7736fd8f80c3be8c9a02cf13db284ff873328b87
+  ldlidar_stl_ros2:
+    type: git
+    url: https://github.com/cme-research/ldlidar_stl_ros2.git
+    version: 5acebe7c7dea671c21b7476ea8c2553f80feaa09
+  mqtt_bridge:
+    type: git
+    url: https://github.com/cme-research/mqtt_bridge.git
+    version: 03323507e9be7d3c8d1441f28591ccc9ace71709
+  dual_laser_merger:
+    type: git
+    url: https://github.com/cme-research/dual_laser_merger.git
+    version: 44ccdcf30ec82fe5cca27f4b996eb81b2232c4ab
