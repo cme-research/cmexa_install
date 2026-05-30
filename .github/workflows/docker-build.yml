@@ -117,11 +117,12 @@ jobs:
         run: |
           set -euo pipefail
           src="${IMG}:${DISTRO}-${SHA}"
-          # Build job (branch push) may still be running when the tag push triggers promote — wait up to 30 min.
-          deadline=$(( $(date +%s) + 1800 ))
+          # Build job (branch push) may still be running when the tag push triggers promote — wait up to 60 min.
+          # Hardware multi-arch build regularly takes ~35 min; 30 min was too tight and timed out for jazzy-v0.5.2.
+          deadline=$(( $(date +%s) + 3600 ))
           until docker buildx imagetools inspect "${src}" >/dev/null 2>&1; do
             if (( $(date +%s) > deadline )); then
-              echo "::error::Source image ${src} not found after 30 min. Tag a commit merged to '${DISTRO}' that has been built by the 'build' job."
+              echo "::error::Source image ${src} not found after 60 min. Tag a commit merged to '${DISTRO}' that has been built by the 'build' job."
               exit 1
             fi
             echo "Source image not ready yet, waiting 30s..."
