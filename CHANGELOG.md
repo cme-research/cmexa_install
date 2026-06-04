@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.6.0](https://github.com/cme-research/cmexa_install/compare/jazzy-v0.5.2...jazzy-v0.6.0) (2026-06-04)
+
+
+### Neue Features
+
+* **repos:** bundle cmeresearch_robot_state in hardware image ([#36](https://github.com/cme-research/cmexa_install/issues/36)) ([6640ad7](https://github.com/cme-research/cmexa_install/commit/6640ad701fde9c07ef83b0935353733bddb4bb25))
+
+
+### Bug Fixes
+
+* **repos:** bump cmeresearch_bringup to c54406d ([#37](https://github.com/cme-research/cmexa_install/issues/37)) ([db38d5b](https://github.com/cme-research/cmexa_install/commit/db38d5ba71a60027e1668a2a9d9586cd2abf21a1))
+
 ## [0.5.2](https://github.com/cme-research/cmexa_install/compare/jazzy-v0.5.1...jazzy-v0.5.2) (2026-05-30)
 
 
