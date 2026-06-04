@@ -11,6 +11,10 @@ repositories:
     type: git
     url: https://github.com/cme-research/cmeresearch_msgs.git
     version: 023d3e8051baacc178e52674e76ac30cd8d67569
+  cmeresearch_robot_state:
+    type: git
+    url: https://github.com/cme-research/cmeresearch_robot_state.git
+    version: ba7113a0003446af60eb0b7fb9585f14a2e0fe86
   cmeresearch_stepper_driver:
     type: git
     url: https://github.com/cme-research/cmeresearch_stepper_driver.git
