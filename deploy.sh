@@ -166,6 +166,14 @@ echo "==> Starting services..."
 ROBOT_VERSION="${ROBOT_VERSION}" WEBAPP_VERSION="${WEBAPP_VERSION}" \
   docker compose -f "${COMPOSE_FILE}" "${PROFILE_ARGS[@]}" up -d
 
+# Mosquitto's image tag is unpinned (eclipse-mosquitto:latest) and its config
+# is bind-mounted from docker/mosquitto/bridge.conf. Neither bind-mount content
+# changes nor unchanged image digests trigger `up -d` to recreate. Force a
+# recreate so config edits actually reach the running container.
+echo "==> Recreating mosquitto to pick up bind-mounted config changes..."
+ROBOT_VERSION="${ROBOT_VERSION}" WEBAPP_VERSION="${WEBAPP_VERSION}" \
+  docker compose -f "${COMPOSE_FILE}" "${PROFILE_ARGS[@]}" up -d --force-recreate --no-deps mosquitto
+
 echo ""
 echo "==> Done. Running services:"
 docker compose -f "${COMPOSE_FILE}" "${PROFILE_ARGS[@]}" ps

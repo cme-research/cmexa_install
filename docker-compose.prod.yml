@@ -12,7 +12,12 @@ services:
       - mosquitto_data:/mosquitto/data
       - mosquitto_log:/mosquitto/log
     healthcheck:
-      test: ["CMD-SHELL", "mosquitto_sub -t '$$SYS/#' -C 1 -i healthcheck -W 3 || exit 1"]
+      # Connect via the container's own non-loopback IP. mosquitto_sub without
+      # -h defaults to localhost (lo), which would still pass even if the
+      # listener is misconfigured as `listener 1883 localhost` and therefore
+      # unreachable from outside the container. $(hostname -i) fails the
+      # check in that broken state.
+      test: ["CMD-SHELL", "mosquitto_sub -h \"$$(hostname -i | awk '{print $$1}')\" -t '$$SYS/#' -C 1 -i healthcheck -W 3 || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 3
