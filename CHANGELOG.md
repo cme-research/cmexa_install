@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.1](https://github.com/cme-research/cmexa_install/compare/jazzy-v0.6.0...jazzy-v0.6.1) (2026-06-12)
+
+
+### Bug Fixes
+
+* **deploy,healthcheck:** force-recreate mosquitto and probe via eth0 ([#35](https://github.com/cme-research/cmexa_install/issues/35)) ([#40](https://github.com/cme-research/cmexa_install/issues/40)) ([fe6c244](https://github.com/cme-research/cmexa_install/commit/fe6c244b1a286ba932414e56bc7428da0b4b212f))
+
 ## [0.6.0](https://github.com/cme-research/cmexa_install/compare/jazzy-v0.5.2...jazzy-v0.6.0) (2026-06-04)
 
 
