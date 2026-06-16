@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.6.3](https://github.com/cme-research/cmexa_install/compare/jazzy-v0.6.2...jazzy-v0.6.3) (2026-06-14)
+
+
+### Bug Fixes
+
+* **repos:** bump cmeresearch_bringup to bed0042 ([d3a562e](https://github.com/cme-research/cmexa_install/commit/d3a562e723f34d3d9165c59f55749fcf0aa2b887))
+* **repos:** bump cmeresearch_bringup to bed0042 ([417f620](https://github.com/cme-research/cmexa_install/commit/417f620079d1b653d80602ae0b33323d54afe70c))
+
 ## [0.6.2](https://github.com/cme-research/cmexa_install/compare/jazzy-v0.6.1...jazzy-v0.6.2) (2026-06-14)
 
 
