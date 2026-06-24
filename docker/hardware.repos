@@ -18,7 +18,7 @@ repositories:
   cmeresearch_stepper_driver:
     type: git
     url: https://github.com/cme-research/cmeresearch_stepper_driver.git
-    version: 9d39b2c24b66c34b4927ba863370fe0f3f1317b8
+    version: 1ab379efb8bc80b8028c457459793dce8d5a4f0e
   cmexa_base:
     type: git
     url: https://github.com/cme-research/cmexa_base.git
