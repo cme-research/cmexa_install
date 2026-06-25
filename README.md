@@ -103,6 +103,123 @@ docker compose -f docker-compose.prod.yml logs -f hardware
 
 ---
 
+## Operating the robot
+
+### Web dashboard
+
+The webapp container serves a Django control panel on the robot host using `network_mode: host`. From any machine on the same LAN:
+
+```
+http://<robot-ip>/        # port 80 redirects to 8000
+http://<robot-ip>:8000/   # Django app directly
+```
+
+Find `<robot-ip>` with `hostname -I` on the Pi (the robot is normally `192.168.1.202` on the lab subnet).
+
+The dashboard provides:
+
+- **Teleop** — touch joysticks to drive the base, plus live mini-tiles for stream status, motor voltage, system (Pi) stats, motor velocity and odometry.
+- **Mission** — queue named poses / navigation goals.
+- **Navigation** — live map view with pose markers.
+- **Logs** — tail the Docker container logs from the browser.
+
+Teleop and the webapp talk to the robot over **MQTT** (the `mosquitto` broker in the stack), not directly over ROS 2. The `hardware` container runs the MQTT↔ROS bridge that turns dashboard commands into `/cmexaiii/.../cmd_vel` messages and republishes odometry/voltage back to the dashboard.
+
+### Switching nav mode
+
+The `nav` container is only started when you pass `--nav` to `deploy.sh`. Choose mapping vs. localization with `LAUNCH_FILE` in `.env` (see [Switch nav mode](#switch-nav-mode-without-restarting-hardware) above). In localization mode the map is loaded from `/robot/data/maps` on the host (bind-mounted into the container at `/maps`).
+
+---
+
+## Connecting a Linux PC to the robot's ROS 2 graph
+
+By default you only see the robot through the web dashboard (MQTT). To inspect the **ROS 2 topics directly** from your laptop (`ros2 topic list`, `ros2 topic echo`, RViz, `rqt`, etc.) the PC has to join the same DDS network as the containers.
+
+The robot's containers run with this DDS configuration (`docker/ros_entrypoint.sh`):
+
+| Setting | Value | Why |
+|---|---|---|
+| `RMW_IMPLEMENTATION` | `rmw_cyclonedds_cpp` | All nodes use CycloneDDS; a PC on the default Fast DDS will **not** discover them |
+| `ROS_DOMAIN_ID` | `12` | Must match exactly or topics are invisible |
+| `ROS_AUTOMATIC_DISCOVERY_RANGE` | `SUBNET` | Discovery stays within the local subnet |
+| `CYCLONEDDS_URI` | `file:///cyclonedds.xml` | Multicast **disabled**, peers listed explicitly (see `docker/cyclonedds.xml`) |
+
+Because multicast is off, your PC must be listed as a peer **and** must list the robot as a peer — discovery is unicast-only.
+
+### 1. Prerequisites
+
+- Same subnet as the robot (e.g. `192.168.1.0/24`), reachable via `ping 192.168.1.202`.
+- ROS 2 **Jazzy** installed (`/opt/ros/jazzy`).
+- The CycloneDDS RMW:
+
+  ```bash
+  sudo apt install ros-jazzy-rmw-cyclonedds-cpp
+  ```
+
+### 2. Create a CycloneDDS config on the PC
+
+Copy `docker/cyclonedds.xml` from this repo to your home directory (the path the exports below point at) and adjust the peer list so it contains **the robot's IP and your PC's own IP**. Leave multicast disabled to match the robot:
+
+```bash
+cp docker/cyclonedds.xml ~/cyclonedds.xml
+```
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<CycloneDDS xmlns="https://cdds.io/config">
+  <Domain>
+    <General>
+      <AllowMulticast>false</AllowMulticast>
+    </General>
+    <Discovery>
+      <Peers>
+        <Peer address="localhost"/>
+        <Peer address="192.168.1.202"/>   <!-- the robot / docker host -->
+        <Peer address="192.168.1.78"/>    <!-- THIS PC's LAN IP -->
+      </Peers>
+    </Discovery>
+    <Tracing>
+      <Verbosity>severe</Verbosity>
+    </Tracing>
+  </Domain>
+</CycloneDDS>
+```
+
+> The robot's own `cyclonedds.xml` must in turn list your PC's IP under `<Peers>`. The shipped config already lists `192.168.1.78`; if your PC has a different IP, add it there too and redeploy (it is bind-mounted, so `bash deploy.sh` picks it up — mosquitto-style force-recreate not needed for the hardware/nav containers, just restart them).
+
+### 3. Add the exports to your `~/.bashrc`
+
+These five lines are all that is needed — they mirror the container settings exactly (only `CYCLONEDDS_URI` points at the PC-local copy):
+
+```bash
+source /opt/ros/jazzy/setup.bash
+export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+export ROS_DOMAIN_ID=12
+export ROS_AUTOMATIC_DISCOVERY_RANGE=SUBNET
+export CYCLONEDDS_URI=file:///home/<your-user>/cyclonedds.xml
+```
+
+Open a new shell (or `source ~/.bashrc`) so the exports take effect.
+
+### 4. Verify
+
+With the robot stack running:
+
+```bash
+ros2 topic list                     # should show /cmexaiii/..., /scan_combined, /tf, etc.
+ros2 topic echo /base_mecanum_controller/tf_odometry --once
+ros2 node list
+```
+
+If `ros2 topic list` is empty:
+
+- **Domain mismatch** — confirm `echo $ROS_DOMAIN_ID` prints `12`.
+- **Wrong RMW** — confirm `echo $RMW_IMPLEMENTATION` is `rmw_cyclonedds_cpp`; a stale Fast DDS shell sees nothing.
+- **Peer/firewall** — your PC's IP must be in the robot's `cyclonedds.xml` peer list, and any host firewall must allow UDP in the 7400–7500 range on the subnet.
+- **Different subnet / VPN** — `SUBNET` discovery won't cross routers; be on the same L2 network as the robot.
+
+---
+
 ## CI/CD Pipeline
 
 Images are built once on merge to `jazzy` and **promoted** (retagged, not rebuilt) when you push a `jazzy-v*` tag. Releases are byte-identical to what was tested on the merge commit, and tag-to-published is seconds, not minutes.
