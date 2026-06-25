@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.7.0](https://github.com/cme-research/cmexa_install/compare/jazzy-v0.6.7...jazzy-v0.7.0) (2026-06-25)
+
+
+### Neue Features
+
+* **build:** add build.sh to build robot images locally ([e2acc1e](https://github.com/cme-research/cmexa_install/commit/e2acc1e2af7c58e7ad2985427a7e27b6c83765e7))
+* **build:** add build.sh to build robot images locally ([c2030e8](https://github.com/cme-research/cmexa_install/commit/c2030e8d6a9852ed27bfce2aa6ee42da35f490eb))
+
+
+### Dokumentation
+
+* **readme:** operate the robot + connect a Linux PC to the ROS 2 graph ([7e855f7](https://github.com/cme-research/cmexa_install/commit/7e855f7a6332f759c1820b4c24aea63b1d02ca49))
+
 ## [0.6.7](https://github.com/cme-research/cmexa_install/compare/jazzy-v0.6.6...jazzy-v0.6.7) (2026-06-25)
 
 
