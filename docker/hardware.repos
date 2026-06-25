@@ -2,7 +2,7 @@ repositories:
   cmeresearch_bringup:
     type: git
     url: https://github.com/cme-research/cmeresearch_bringup.git
-    version: b4f92115b6f27d39d2009f3e5231b42ccc55b38c
+    version: f07902ce2973b131f9e8ca5b113d703352c4bafa
   cmeresearch_description:
     type: git
     url: https://github.com/cme-research/cmeresearch_description.git
@@ -18,7 +18,7 @@ repositories:
   cmeresearch_stepper_driver:
     type: git
     url: https://github.com/cme-research/cmeresearch_stepper_driver.git
-    version: 1ab379efb8bc80b8028c457459793dce8d5a4f0e
+    version: a53e2f3b9f3dc73f171f52e24c86737bf85177b1
   cmexa_base:
     type: git
     url: https://github.com/cme-research/cmexa_base.git
