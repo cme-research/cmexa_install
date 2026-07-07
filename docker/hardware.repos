@@ -6,7 +6,7 @@ repositories:
   cmeresearch_description:
     type: git
     url: https://github.com/cme-research/cmeresearch_description.git
-    version: 9eb64bc9521551ee0216052cf7e5a361cb0c6b1c
+    version: def717533b1548252deca75c28ae8fdc0a4369b8
   cmeresearch_msgs:
     type: git
     url: https://github.com/cme-research/cmeresearch_msgs.git
