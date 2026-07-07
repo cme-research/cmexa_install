@@ -6,7 +6,7 @@ repositories:
   cmeresearch_description:
     type: git
     url: https://github.com/cme-research/cmeresearch_description.git
-    version: 9eb64bc9521551ee0216052cf7e5a361cb0c6b1c
+    version: def717533b1548252deca75c28ae8fdc0a4369b8
   cmeresearch_msgs:
     type: git
     url: https://github.com/cme-research/cmeresearch_msgs.git
@@ -22,7 +22,7 @@ repositories:
   cmexa_base:
     type: git
     url: https://github.com/cme-research/cmexa_base.git
-    version: 6c39f5573b9a5b4c8a44840004e96723bc5c5550
+    version: afb76f9e902bf6589e1b33c791ea964439cbd46b
   joy2twist:
     type: git
     url: https://github.com/cme-research/joy2twist.git
