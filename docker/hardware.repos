@@ -22,7 +22,7 @@ repositories:
   cmexa_base:
     type: git
     url: https://github.com/cme-research/cmexa_base.git
-    version: 6c39f5573b9a5b4c8a44840004e96723bc5c5550
+    version: afb76f9e902bf6589e1b33c791ea964439cbd46b
   joy2twist:
     type: git
     url: https://github.com/cme-research/joy2twist.git
