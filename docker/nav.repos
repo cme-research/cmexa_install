@@ -10,4 +10,4 @@ repositories:
   cmeresearch_environments:
     type: git
     url: https://github.com/cme-research/cmeresearch_environments.git
-    version: 5a32a699ace8125d72eecabd8dcbc203d0557794
+    version: 8ca9ece2ef60f3f1c8775df7e8b12e43297e60b3
