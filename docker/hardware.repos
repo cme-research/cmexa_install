@@ -34,7 +34,7 @@ repositories:
   mqtt_bridge:
     type: git
     url: https://github.com/cme-research/mqtt_bridge.git
-    version: 03323507e9be7d3c8d1441f28591ccc9ace71709
+    version: a8a8dbe42a46dc8f7caa0b1f9761fee49c00c0c9
   dual_laser_merger:
     type: git
     url: https://github.com/cme-research/dual_laser_merger.git
