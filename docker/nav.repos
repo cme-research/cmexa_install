@@ -6,7 +6,7 @@ repositories:
   cmeresearch_msgs:
     type: git
     url: https://github.com/cme-research/cmeresearch_msgs.git
-    version: fe4c7f104c3cac25114ef19cb18c16443bef818f
+    version: 4fe0d11dc4571c06aed06576d3cc7db67fc30d2a
   cmeresearch_environments:
     type: git
     url: https://github.com/cme-research/cmeresearch_environments.git
