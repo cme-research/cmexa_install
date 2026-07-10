@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.7.3](https://github.com/cme-research/cmexa_install/compare/jazzy-v0.7.2...jazzy-v0.7.3) (2026-07-10)
+
+
+### Bug Fixes
+
+* **repos:** bump cmeresearch_environments to 8ca9ece ([9073d5a](https://github.com/cme-research/cmexa_install/commit/9073d5a00ea387abde413fef88921a9031bef839))
+* **repos:** bump cmeresearch_environments to 8ca9ece ([da303d9](https://github.com/cme-research/cmexa_install/commit/da303d9c88c2983fb4d6622fd79d42b8cb966839))
+* **repos:** bump cmeresearch_msgs to 4fe0d11 ([df4a206](https://github.com/cme-research/cmexa_install/commit/df4a206a10e79cfacfdab209eaf884b4589b0457))
+* **repos:** bump cmeresearch_msgs to 4fe0d11 ([27cac98](https://github.com/cme-research/cmexa_install/commit/27cac98cf212c839f936f7a127922199fad063c8))
+* **repos:** bump cmeresearch_stepper_driver to 58af79c ([4ff9dbb](https://github.com/cme-research/cmexa_install/commit/4ff9dbb18cec5c2af35718694566e748bf1fad69))
+* **repos:** bump cmeresearch_stepper_driver to 58af79c ([be851bf](https://github.com/cme-research/cmexa_install/commit/be851bfe4106cd6870fbaebf2bae57a41259c52d))
+* **repos:** bump mqtt_bridge to a8a8dbe ([b496f87](https://github.com/cme-research/cmexa_install/commit/b496f8740c0989f224adc32f1d3e61d25b21025a))
+* **repos:** bump mqtt_bridge to a8a8dbe ([4625309](https://github.com/cme-research/cmexa_install/commit/46253097b6cc93b06dcfd97505f310459ff33d53))
+
 ## [0.7.2](https://github.com/cme-research/cmexa_install/compare/jazzy-v0.7.1...jazzy-v0.7.2) (2026-07-07)
 
 
