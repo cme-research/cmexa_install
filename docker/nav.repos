@@ -2,11 +2,11 @@ repositories:
   cmeresearch_bringup:
     type: git
     url: https://github.com/cme-research/cmeresearch_bringup.git
-    version: f07902ce2973b131f9e8ca5b113d703352c4bafa
+    version: cdcba82acb94a1615ffd061c5b29e781957d51a0
   cmeresearch_msgs:
     type: git
     url: https://github.com/cme-research/cmeresearch_msgs.git
-    version: 4fe0d11dc4571c06aed06576d3cc7db67fc30d2a
+    version: 109106a25ef6968b0dec9f7766726490176ea2c3
   cmeresearch_environments:
     type: git
     url: https://github.com/cme-research/cmeresearch_environments.git
