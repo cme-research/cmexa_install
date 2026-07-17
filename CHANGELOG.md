@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.7.4](https://github.com/cme-research/cmexa_install/compare/jazzy-v0.7.3...jazzy-v0.7.4) (2026-07-17)
+
+
+### Bug Fixes
+
+* **repos:** bump cmeresearch_bringup to cdcba82 ([c9d47d6](https://github.com/cme-research/cmexa_install/commit/c9d47d619a88891c1de4a5e23ec01e16dee311e8))
+* **repos:** bump cmeresearch_bringup to cdcba82 ([5c5e351](https://github.com/cme-research/cmexa_install/commit/5c5e3514a20598c59c8cafb3f0d05e300b313948))
+* **repos:** bump cmeresearch_msgs and cmeresearch_bringup alongside robot_state ([a987743](https://github.com/cme-research/cmexa_install/commit/a9877436db5562fc7d504b0d4da6d2173885e5d5))
+* **repos:** bump cmeresearch_msgs to 109106a ([8789945](https://github.com/cme-research/cmexa_install/commit/8789945baeda38b81fdd84f3befd05adf8bfabfe))
+* **repos:** bump cmeresearch_msgs to 109106a ([63145c3](https://github.com/cme-research/cmexa_install/commit/63145c3bef4094e184529f6f9c5357edb14e4533))
+* **repos:** bump cmeresearch_robot_state to b946602 ([029c0bd](https://github.com/cme-research/cmexa_install/commit/029c0bd8ee999cb9218e41d78877bb24ba6e288d))
+* **repos:** bump cmeresearch_robot_state to b946602 ([aa04a3f](https://github.com/cme-research/cmexa_install/commit/aa04a3fe2b99b97e12ff56f47fc6a45206ec16ed))
+* **repos:** bump cmeresearch_robot_state to b946602 ([a550b97](https://github.com/cme-research/cmexa_install/commit/a550b97f0042c5c0aac350688d278e87dceee711))
+
 ## [0.7.3](https://github.com/cme-research/cmexa_install/compare/jazzy-v0.7.2...jazzy-v0.7.3) (2026-07-10)
 
 
