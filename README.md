@@ -15,12 +15,16 @@ cmexa_install/
 │   ├── Dockerfile.hardware     # Hardware stack: ros2_control, stepper drivers, LiDAR, MQTT bridge
 │   ├── Dockerfile.nav          # Nav stack: nav2, slam_toolbox
 │   ├── cyclonedds.xml          # CycloneDDS config (required on Raspberry Pi aarch64)
-│   ├── ros_entrypoint.sh       # ROS2 entrypoint
-│   └── mosquitto/bridge.conf   # Mosquitto MQTT broker config
+│   ├── ros_entrypoint.sh       # ROS2 entrypoint (honours ROBOT/ROS_DOMAIN_ID)
+│   └── mosquitto/
+│       ├── bridge.conf.template # Bridge config template (rendered per instance)
+│       └── bridge.conf          # Generated Mosquitto bridge config
 ├── docker-compose.yml          # Dev compose (local images)
 ├── docker-compose.prod.yml     # Production compose (ghcr.io images)
 ├── deploy.sh                   # Deploy script (see below)
-├── setup.sh                    # First-time host setup (generates .env)
+├── setup.sh                    # First-time host setup (seeds robot.yaml)
+├── robot.example.yaml          # Config schema / template (copy to robot.yaml)
+├── scripts/render_config.py    # robot.yaml -> compose env-file + bridge.conf
 ├── clone_repos.sh              # Clone all workspace repos via vcs
 └── cmexa_robot.repos           # vcs repos file
 ```
@@ -50,8 +54,23 @@ mosquitto → webapp + brickd → hardware → nav
 ### Prerequisites
 
 - Docker with Compose plugin
+- `python3` + PyYAML (`apt install python3-yaml`) — `deploy.sh` compiles
+  `robot.yaml` via `scripts/render_config.py`
 
 All `ghcr.io/cme-research/...` images used here are **public** — no PAT or `docker login` required.
+
+### Config model: `robot.yaml`
+
+`robot.yaml` is the **single source of truth** for a robot host — identity, DDS
+domain, image versions, nav mode, and runtime settings (see `robot.example.yaml`
+for the full schema). `deploy.sh` compiles it into the derived artifacts the
+stack consumes:
+
+- `.compose.env` — a generated env-file for `docker compose` (never hand-edit)
+- `docker/mosquitto/bridge.conf` — rendered per instance
+
+`robot.yaml` replaces the old `.env` (a one-time migration runs automatically if
+a legacy `.env` is present). All three files are per-host and gitignored.
 
 ### First deploy on a fresh host
 
@@ -61,7 +80,8 @@ cd cmexa_install
 bash deploy.sh --version jazzy-latest
 ```
 
-`deploy.sh` runs `setup.sh` automatically if no `.env` exists yet.
+`deploy.sh` runs `setup.sh` automatically if no `robot.yaml` exists yet (seeding
+it from `robot.example.yaml` with the host-detected joystick GID).
 
 ### Deploy a specific release
 
@@ -69,36 +89,33 @@ bash deploy.sh --version jazzy-latest
 bash deploy.sh --version jazzy-0.1.1
 ```
 
-This pulls `ghcr.io/cme-research/cmexa_hardware:jazzy-0.1.1`, `cmexa_nav:jazzy-0.1.1`, and `cmeresearch_amr_webcontrol:jazzy-0.1.1`, writes the version into `.env`, and starts all services. See `bash deploy.sh --help` for the full accepted version syntax.
+This pulls `ghcr.io/cme-research/cmexa_hardware:jazzy-0.1.1`, `cmexa_nav:jazzy-0.1.1`, and `cmeresearch_amr_webcontrol:jazzy-0.1.1`, writes the version into `robot.yaml`, and starts all services. See `bash deploy.sh --help` for the full accepted version syntax.
 
 ### Deploying a second robot type (e.g. the diff-drive `cmexamini`)
 
 The same `cmexa_hardware` / `cmexa_nav` / webapp images serve **every** robot — the
-robot is selected at runtime, not by a separate image. All robot configuration
-lives in **`.env` on the robot host** (per-host, gitignored). Two identity fields
-drive everything else:
+robot is selected at runtime, not by a separate image. Everything is driven by
+`robot.yaml`; three fields do the heavy lifting:
 
-| `.env` field | Selects |
+| `robot.yaml` field | Selects |
 |---|---|
-| `ROBOT` | ROS launch + description (`<ROBOT>_hardware.launch.py`, `urdf/<ROBOT>/`, `config/<ROBOT>/`) and the container names `<ROBOT>-hardware` / `<ROBOT>-nav` |
-| `ROBOT_INSTANCE` | MQTT topic prefix `cmeresearch/<INSTANCE>/…`, the rendered mosquitto `bridge.conf` routes, and the webapp config (`app_config.<INSTANCE>.json`) |
-| `ROS_DOMAIN_ID` | DDS domain for this robot's ROS 2 graph (hardware + nav). Default `12`. Give a second robot on the **same subnet** its own domain so the graphs don't cross-discover |
+| `identity.robot` | ROS launch + description (`<robot>_hardware.launch.py`, `urdf/<robot>/`, `config/<robot>/`) and the container names `<robot>-hardware` / `<robot>-nav` |
+| `identity.instance` | MQTT topic prefix `cmeresearch/<instance>/…`, the rendered mosquitto `bridge.conf` routes, and the webapp config (`app_config.<instance>.json`) |
+| `ros.domain_id` | DDS domain for this robot's ROS 2 graph (hardware + nav). Default `12`. Give a second robot on the **same subnet** its own domain so the graphs don't cross-discover |
 
 Configure it either way:
 
 ```bash
-# (a) via flags — deploy.sh writes them into .env for you:
-bash deploy.sh --version jazzy-latest --robot cmexamini --instance cmexamini-001 --nav
+# (a) via flags — deploy.sh writes them into robot.yaml for you:
+bash deploy.sh --version jazzy-latest --robot cmexamini --instance cmexamini-001 --domain 13 --nav
 
-# (b) or edit .env directly, then `bash deploy.sh`:
-#   ROBOT=cmexamini
-#   ROBOT_INSTANCE=cmexamini-001
-#   LAUNCH_FILE=cmexamini_nav_mapping.launch.py
-#   ROS_DOMAIN_ID=13        # only if sharing a subnet with another robot
+# (b) or edit robot.yaml directly, then `bash deploy.sh`:
+#   identity: { robot: cmexamini, instance: cmexamini-001 }
+#   ros:      { domain_id: 13, nav_launch: cmexamini_nav_mapping.launch.py }
 ```
 
-Leaving all three unset reproduces the production mecanum `cmexaiii` / `cmexaiii-001`
-deploy exactly.
+Leaving `robot.yaml` at its defaults reproduces the production mecanum
+`cmexaiii` / `cmexaiii-001` deploy exactly.
 
 > **Image rebuild required first.** The launch files, configs and per-instance
 > webapp config for a new robot must be baked into the images: after the robot's
@@ -114,29 +131,34 @@ deploy exactly.
 bash deploy.sh
 ```
 
-### Switch nav mode (without restarting hardware)
+### Switch nav mode
 
-Edit `LAUNCH_FILE` in `.env`, then restart only the nav container:
+Set `ros.nav_launch` in `robot.yaml` to the mapping or localization launch, then
+re-deploy:
 
-```bash
-# Mapping mode
-LAUNCH_FILE=cmexaiii_nav_mapping.launch.py
-
-# Localization mode (loads map from /robot/data/maps)
-LAUNCH_FILE=cmexaiii_nav_localization.launch.py
+```yaml
+# robot.yaml
+ros:
+  nav_launch: cmexaiii_nav_mapping.launch.py        # mapping
+  # nav_launch: cmexaiii_nav_localization.launch.py # localization (map from /robot/data/maps)
 ```
 
 ```bash
-docker compose -f docker-compose.prod.yml stop nav
-docker compose -f docker-compose.prod.yml up -d nav
+bash deploy.sh --nav
 ```
 
 ### Check running services
 
 ```bash
-docker compose -f docker-compose.prod.yml ps
-docker compose -f docker-compose.prod.yml logs -f hardware
+docker ps
+docker logs -f <robot>-hardware      # e.g. cmexaiii-hardware
 ```
+
+> **Note:** raw `docker compose` commands need the generated env to resolve
+> `${ROBOT}`/`${ROS_DOMAIN_ID}` and, on a ROS host, the shell's own exported
+> `ROS_DOMAIN_ID` would otherwise win. Prefer `docker ps`/`docker logs`, or
+> prefix compose calls with `set -a; . .compose.env; set +a`. `deploy.sh` does
+> this for you.
 
 ---
 
@@ -164,7 +186,7 @@ Teleop and the webapp talk to the robot over **MQTT** (the `mosquitto` broker in
 
 ### Switching nav mode
 
-The `nav` container is only started when you pass `--nav` to `deploy.sh`. Choose mapping vs. localization with `LAUNCH_FILE` in `.env` (see [Switch nav mode](#switch-nav-mode-without-restarting-hardware) above). In localization mode the map is loaded from `/robot/data/maps` on the host (bind-mounted into the container at `/maps`).
+The `nav` container is only started when you pass `--nav` to `deploy.sh`. Choose mapping vs. localization with `ros.nav_launch` in `robot.yaml` (see [Switch nav mode](#switch-nav-mode) above). In localization mode the map is loaded from `/robot/data/maps` on the host (bind-mounted into the container at `/maps`).
 
 ---
 
@@ -331,7 +353,7 @@ git pull
 bash deploy.sh --version jazzy-1.4.0
 ```
 
-This writes `ROBOT_VERSION=jazzy-1.4.0` to `.env`, pulls the pinned images, and restarts services. Without `--version`, `deploy.sh` defaults to `:jazzy-latest` (the most recent stable release on jazzy) — never the rolling `:jazzy` build.
+This writes `images.robot_version: jazzy-1.4.0` to `robot.yaml`, pulls the pinned images, and restarts services. Without `--version`, `deploy.sh` defaults to `:jazzy-latest` (the most recent stable release on jazzy) — never the rolling `:jazzy` build.
 
 **8. Create a GitHub release** (optional but recommended) — generates release notes and pins documentation to the tag:
 

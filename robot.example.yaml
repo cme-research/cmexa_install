@@ -1,0 +1,66 @@
+# robot.example.yaml — copy to robot.yaml (or let deploy.sh/setup.sh seed it).
+#
+# robot.yaml is the SINGLE source of truth for a robot host. deploy.sh compiles
+# it (via scripts/render_config.py) into the generated compose env-file and the
+# mosquitto bridge.conf. Do not hand-edit those derived files or the old .env.
+#
+# Defaults target the production mecanum cmexaiii; the values below show the
+# diff-drive mini for reference.
+schema_version: 1
+
+identity:
+  robot: cmexaiii              # robot type -> launch/description/config selection
+  instance: cmexaiii-001       # MQTT id -> cmeresearch/<instance>/... prefix
+  name: "CMEXA III"            # display name (webapp header)
+
+ros:
+  domain_id: 12                # DDS domain; give robots on one subnet distinct ids
+  nav_launch: cmexaiii_nav_mapping.launch.py   # mapping | localization
+  robot_env: house
+
+images:                        # image tags deploy.sh pins (or --version overrides)
+  robot_version: latest
+  webapp_version: latest       # 'latest'/empty -> same as robot_version
+
+host:                          # host-detected at provisioning (was in .env)
+  input_gid: ""                # 'input' group GID for joystick access
+
+mqtt:
+  broker_url: localhost
+  broker_port: 1883
+  remote_broker: 10.8.0.1:1883
+
+# ---- Runtime (hot-applicable) — consumed by the webapp, no restart needed -----
+control:
+  drive_type: mecanum          # mecanum | diff
+  limits:
+    max_linear_x: 0.31
+    max_linear_y: 0.3
+    max_angular_z: 0.8
+  velocities:
+    forward: 0.2
+    backward: -0.2
+    left: 0.2
+    right: -0.2
+    rotate_cw: -0.5
+    rotate_ccw: 0.5
+  motor_feedback_wheels: [front_left, front_right, rear_left, rear_right]
+  docker_log_container: cmexaiii-hardware
+
+map:
+  map_id: cmexaiii_house
+  width: 20
+  height: 20
+  resolution: 0.05
+  origin_x: -10.0
+  origin_y: -10.0
+
+# ---- Diff-drive mini reference (swap the blocks above for these) --------------
+# identity: { robot: cmexamini, instance: cmexamini-001, name: "Mini #1" }
+# ros:      { domain_id: 13, nav_launch: cmexamini_nav_mapping.launch.py }
+# control:
+#   drive_type: diff
+#   limits: { max_linear_x: 0.3, max_linear_y: 0.0, max_angular_z: 1.0 }
+#   motor_feedback_wheels: [front_right, rear_left]
+#   docker_log_container: cmexamini-hardware
+# map: { map_id: cmexamini_house }

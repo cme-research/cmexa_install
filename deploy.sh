@@ -1,5 +1,10 @@
 #!/bin/bash
-# Deploy CMEXAIII robot stack from GHCR.
+# Deploy a robot stack from GHCR.
+#
+# robot.yaml is the single source of truth for this host (identity, DDS domain,
+# image versions, nav mode). This script compiles it via scripts/render_config.py
+# into the generated compose env-file (.compose.env) and the mosquitto bridge
+# config, then brings the stack up. CLI flags below edit robot.yaml in place.
 #
 # Robot images (cmexa_hardware, cmexa_nav) and webapp (cmeresearch_amr_webcontrol)
 # share the same '<distro>-<semver>' tag scheme on GHCR. By default --version
@@ -20,31 +25,34 @@
 
 set -euo pipefail
 
+CONFIG_FILE="robot.yaml"
+ENV_FILE=".compose.env"
+RENDER="scripts/render_config.py"
+
 # Regex: <lowercase-distro>-<latest|semver|sha40>
 VERSION_REGEX='^[a-z]+-(latest|[0-9]+(\.[0-9]+){0,2}(-[0-9A-Za-z.-]+)?|[0-9a-f]{40})$'
 
 usage() {
   cat <<EOF
-Usage: bash deploy.sh --version <distro>-<tag> [--webapp-version <distro>-<tag>]
-                      [--robot <name>] [--instance <name>] [--nav]
+Usage: bash deploy.sh [--version <distro>-<tag>] [--webapp-version <distro>-<tag>]
+                      [--robot <name>] [--instance <name>] [--domain <id>] [--nav]
+
+Config lives in robot.yaml (the single source of truth). The flags below edit it;
+omitting a flag keeps whatever robot.yaml already has. On a fresh host robot.yaml
+is seeded from robot.example.yaml (or migrated from a legacy .env).
 
 By default this deploys mosquitto, webapp, brickd and hardware only.
 Pass --nav to additionally start the navigation container.
 
-Robot identity (defaults preserve the production mecanum robot):
-  --robot     robot type; selects the ROS launch/description via the ROBOT env
-              and the container names (<robot>-hardware / <robot>-nav).
-              default: cmexaiii
-  --instance  MQTT instance id; the cmeresearch/<instance>/... topic prefix and
-              the mosquitto bridge routing. default: <robot>-001
+Identity (defaults preserve the production mecanum robot):
+  --robot      robot type; selects launch/description/config + container names
+  --instance   MQTT instance id -> cmeresearch/<instance>/... + bridge routing
+  --domain     ROS_DOMAIN_ID; give robots on one subnet distinct domains
 
 Examples:
   bash deploy.sh --version jazzy-0.1.0                # cmexaiii hardware stack
   bash deploy.sh --version jazzy-0.1.0 --nav          # cmexaiii + nav
-  bash deploy.sh --version jazzy-latest --nav
-  bash deploy.sh --version jazzy-0.1.0 --webapp-version jazzy-0.2.0 --nav
-  # diff-drive mini:
-  bash deploy.sh --version jazzy-latest --robot cmexamini --instance cmexamini-001 --nav
+  bash deploy.sh --version jazzy-latest --robot cmexamini --instance cmexamini-001 --domain 13 --nav
 
 Versions must match: ${VERSION_REGEX}
 EOF
@@ -54,7 +62,7 @@ validate_version() {
   local label="$1"
   local value="$2"
   if [[ -z "$value" ]]; then
-    echo "ERROR: ${label} is empty." >&2
+    echo "ERROR: ${label} is empty — pass --version <distro>-<semver> (robot.yaml has no image version yet)." >&2
     usage >&2
     exit 1
   fi
@@ -69,114 +77,57 @@ validate_version() {
   fi
 }
 
-ROBOT_VERSION=""
-WEBAPP_VERSION=""
-ROBOT_VERSION_SET=false
-WEBAPP_VERSION_SET=false
 USE_NAV=false
-# Robot identity (type + instance). Default to the production mecanum cmexaiii /
-# cmexaiii-001 so existing deploys are unaffected. A second robot type (e.g. the
-# diff-drive mini) sets --robot cmexamini --instance cmexamini-001.
-ROBOT=""
-ROBOT_INSTANCE=""
-ROBOT_SET=false
-ROBOT_INSTANCE_SET=false
+# Overrides collected from flags and applied to robot.yaml via render_config.
+SETS=()
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --version)
-      ROBOT_VERSION="${2:-}"
-      ROBOT_VERSION_SET=true
-      shift 2
-      ;;
-    --webapp-version)
-      WEBAPP_VERSION="${2:-}"
-      WEBAPP_VERSION_SET=true
-      shift 2
-      ;;
-    --robot)
-      ROBOT="${2:-}"
-      ROBOT_SET=true
-      shift 2
-      ;;
-    --instance)
-      ROBOT_INSTANCE="${2:-}"
-      ROBOT_INSTANCE_SET=true
-      shift 2
-      ;;
-    --nav)
-      USE_NAV=true
-      shift
-      ;;
-    -h|--help)
-      usage
-      exit 0
-      ;;
-    *)
-      echo "Unknown argument: $1" >&2
-      usage >&2
-      exit 1
-      ;;
+    --version)         SETS+=(--set "images.robot_version=${2:-}");   shift 2 ;;
+    --webapp-version)  SETS+=(--set "images.webapp_version=${2:-}");  shift 2 ;;
+    --robot)           SETS+=(--set "identity.robot=${2:-}");         shift 2 ;;
+    --instance)        SETS+=(--set "identity.instance=${2:-}");      shift 2 ;;
+    --domain)          SETS+=(--set "ros.domain_id=${2:-}");          shift 2 ;;
+    --nav)             USE_NAV=true;                                  shift ;;
+    -h|--help)         usage; exit 0 ;;
+    *) echo "Unknown argument: $1" >&2; usage >&2; exit 1 ;;
   esac
 done
 
-# Generate .env if it doesn't exist yet (also sources values like INPUT_GID)
-if [ ! -f .env ]; then
-  echo "==> No .env found, running setup.sh first..."
-  bash setup.sh
-fi
-
-# If a flag was not passed, fall back to whatever is pinned in .env.
-read_env_value() {
-  local key="$1"
-  if grep -q "^${key}=" .env 2>/dev/null; then
-    awk -F= -v k="$key" '$1==k {sub(/^[^=]+=/,""); print; exit}' .env
-  fi
+command -v python3 >/dev/null 2>&1 || {
+  echo "ERROR: python3 is required (deploy uses scripts/render_config.py)." >&2
+  exit 1
 }
 
-if ! $ROBOT_VERSION_SET; then
-  ROBOT_VERSION="$(read_env_value ROBOT_VERSION)"
-fi
-
-# Webapp defaults to the same version as the robot when not explicitly pinned.
-if ! $WEBAPP_VERSION_SET; then
-  WEBAPP_VERSION="$(read_env_value WEBAPP_VERSION)"
-  if [[ -z "$WEBAPP_VERSION" || "$WEBAPP_VERSION" == "latest" ]]; then
-    WEBAPP_VERSION="$ROBOT_VERSION"
+# Ensure robot.yaml exists: migrate a legacy .env, else seed from setup.sh.
+MIGRATE_ARGS=()
+if [ ! -f "$CONFIG_FILE" ]; then
+  if [ -f .env ]; then
+    echo "==> No robot.yaml — migrating legacy .env into it..."
+    MIGRATE_ARGS=(--migrate-env .env)
+  else
+    echo "==> No robot.yaml — seeding host config via setup.sh..."
+    bash setup.sh
   fi
 fi
 
-validate_version "ROBOT_VERSION"  "$ROBOT_VERSION"
-validate_version "WEBAPP_VERSION" "$WEBAPP_VERSION"
-
-# Resolve robot identity: CLI flag > .env > default (cmexaiii / <robot>-001).
-if ! $ROBOT_SET; then
-  ROBOT="$(read_env_value ROBOT)"
+# Compile robot.yaml -> env-file + bridge.conf (persisting flag edits/migration).
+WRITE_ARGS=()
+if [[ ${#SETS[@]} -gt 0 || ${#MIGRATE_ARGS[@]} -gt 0 ]]; then
+  WRITE_ARGS=(--write)
 fi
-ROBOT="${ROBOT:-cmexaiii}"
+python3 "$RENDER" --config "$CONFIG_FILE" \
+  "${MIGRATE_ARGS[@]}" "${SETS[@]}" "${WRITE_ARGS[@]}" \
+  --emit-env "$ENV_FILE" --render-bridge
 
-if ! $ROBOT_INSTANCE_SET; then
-  ROBOT_INSTANCE="$(read_env_value ROBOT_INSTANCE)"
-fi
-ROBOT_INSTANCE="${ROBOT_INSTANCE:-${ROBOT}-001}"
+# Load the resolved values for this script's own logic (echo, nav cleanup).
+set -a
+# shellcheck disable=SC1090
+. "$ENV_FILE"
+set +a
 
-# Nav launch file: .env override, else the robot's mapping launch by convention.
-# Auto-correct a launch file that does not belong to this robot (e.g. a stale
-# cmexaiii default written by setup.sh when deploying the mini). An explicit
-# same-robot choice (mapping vs localization) is preserved.
-LAUNCH_FILE="$(read_env_value LAUNCH_FILE)"
-if [[ -z "$LAUNCH_FILE" || "$LAUNCH_FILE" != ${ROBOT}_* ]]; then
-  LAUNCH_FILE="${ROBOT}_nav_mapping.launch.py"
-fi
-
-# Hardware launch is derived from the robot type. The hardware image's CMD is
-# cmexaiii-specific, so compose must override it (see docker-compose.prod.yml).
-HARDWARE_LAUNCH_FILE="${ROBOT}_hardware.launch.py"
-
-# DDS domain: .env override, else 12 (the historical baked-in default). Give a
-# second robot on the SAME subnet its own domain to isolate the two ROS graphs.
-ROS_DOMAIN_ID="$(read_env_value ROS_DOMAIN_ID)"
-ROS_DOMAIN_ID="${ROS_DOMAIN_ID:-12}"
+validate_version "ROBOT_VERSION"  "${ROBOT_VERSION:-}"
+validate_version "WEBAPP_VERSION" "${WEBAPP_VERSION:-}"
 
 COMPOSE_FILE="docker-compose.prod.yml"
 
@@ -190,77 +141,29 @@ fi
 
 echo "==> Deploying ${ROBOT} stack (instance: ${ROBOT_INSTANCE}, domain: ${ROS_DOMAIN_ID}, robot: ${ROBOT_VERSION}, webapp: ${WEBAPP_VERSION}, nav: ${NAV_LABEL})"
 
-# Write version + identity overrides into .env (replace or append)
-update_env() {
-  local key="$1"
-  local value="$2"
-  if grep -q "^${key}=" .env; then
-    sed -i "s|^${key}=.*|${key}=${value}|" .env
-  else
-    echo "${key}=${value}" >> .env
-  fi
-}
-
-update_env "ROBOT_VERSION" "${ROBOT_VERSION}"
-update_env "WEBAPP_VERSION" "${WEBAPP_VERSION}"
-update_env "ROBOT" "${ROBOT}"
-update_env "ROBOT_INSTANCE" "${ROBOT_INSTANCE}"
-update_env "LAUNCH_FILE" "${LAUNCH_FILE}"
-update_env "ROS_DOMAIN_ID" "${ROS_DOMAIN_ID}"
-
-# Render the mosquitto bridge config for this instance from the template. The
-# topic routes and remote_clientid are instance-scoped; substituting here keeps
-# a single source of truth (bridge.conf.template) across robot types. For
-# cmexaiii/cmexaiii-001 this reproduces the committed bridge.conf byte-for-byte.
-BRIDGE_TEMPLATE="docker/mosquitto/bridge.conf.template"
-BRIDGE_CONF="docker/mosquitto/bridge.conf"
-if [[ -f "$BRIDGE_TEMPLATE" ]]; then
-  echo "==> Rendering ${BRIDGE_CONF} for ${ROBOT_INSTANCE}..."
-  sed -e "s@__ROBOT_INSTANCE__@${ROBOT_INSTANCE}@g" \
-      -e "s@__ROBOT__@${ROBOT}@g" \
-      "$BRIDGE_TEMPLATE" > "$BRIDGE_CONF"
-fi
-
 # If --nav is NOT set, stop any previously running nav container so we don't
 # leave a stale one behind from an earlier full deploy.
 if ! $USE_NAV; then
   if docker ps -a --format '{{.Names}}' | grep -qx "${ROBOT}-nav"; then
     echo "==> --nav not set: stopping leftover nav container..."
-    ROBOT="${ROBOT}" LAUNCH_FILE="${LAUNCH_FILE}" \
-      docker compose -f "${COMPOSE_FILE}" --profile nav stop nav 2>/dev/null || true
-    ROBOT="${ROBOT}" LAUNCH_FILE="${LAUNCH_FILE}" \
-      docker compose -f "${COMPOSE_FILE}" --profile nav rm -f nav 2>/dev/null || true
+    docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" --profile nav stop nav 2>/dev/null || true
+    docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" --profile nav rm -f nav 2>/dev/null || true
   fi
 fi
 
-# Env exported to every compose call: image tags + robot identity + nav launch.
-COMPOSE_ENV=(
-  "ROBOT_VERSION=${ROBOT_VERSION}"
-  "WEBAPP_VERSION=${WEBAPP_VERSION}"
-  "ROBOT=${ROBOT}"
-  "ROBOT_INSTANCE=${ROBOT_INSTANCE}"
-  "LAUNCH_FILE=${LAUNCH_FILE}"
-  "HARDWARE_LAUNCH_FILE=${HARDWARE_LAUNCH_FILE}"
-  "ROS_DOMAIN_ID=${ROS_DOMAIN_ID}"
-)
-
 echo "==> Pulling images..."
-env "${COMPOSE_ENV[@]}" \
-  docker compose -f "${COMPOSE_FILE}" "${PROFILE_ARGS[@]}" pull
+docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" "${PROFILE_ARGS[@]}" pull
 
 echo "==> Starting services..."
-env "${COMPOSE_ENV[@]}" \
-  docker compose -f "${COMPOSE_FILE}" "${PROFILE_ARGS[@]}" up -d
+docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" "${PROFILE_ARGS[@]}" up -d
 
 # Mosquitto's image tag is unpinned (eclipse-mosquitto:latest) and its config
 # is bind-mounted from docker/mosquitto/bridge.conf. Neither bind-mount content
 # changes nor unchanged image digests trigger `up -d` to recreate. Force a
 # recreate so config edits actually reach the running container.
 echo "==> Recreating mosquitto to pick up bind-mounted config changes..."
-env "${COMPOSE_ENV[@]}" \
-  docker compose -f "${COMPOSE_FILE}" "${PROFILE_ARGS[@]}" up -d --force-recreate --no-deps mosquitto
+docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" "${PROFILE_ARGS[@]}" up -d --force-recreate --no-deps mosquitto
 
 echo ""
 echo "==> Done. Running services:"
-env "${COMPOSE_ENV[@]}" \
-  docker compose -f "${COMPOSE_FILE}" "${PROFILE_ARGS[@]}" ps
+docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" "${PROFILE_ARGS[@]}" ps
