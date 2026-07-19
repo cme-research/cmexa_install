@@ -72,6 +72,22 @@ stack consumes:
 `robot.yaml` replaces the old `.env` (a one-time migration runs automatically if
 a legacy `.env` is present). All three files are per-host and gitignored.
 
+#### Editing config from the web (config page)
+
+The webapp serves a `/config/` page (behind an operator login) that edits
+`robot.yaml` directly. Runtime settings (velocity limits, velocities, map) apply
+live; boot-time settings (robot type, instance, DDS domain, nav mode) offer an
+**Apply & restart** button that re-renders the config and recreates the ROS
+containers.
+
+Apply talks to Docker through a **least-privilege `socket-proxy`** (bound to
+`127.0.0.1:2375`, not the LAN) — the webapp holds **no raw docker socket**. It
+runs `docker compose` against this deploy dir, which is bind-mounted into the
+webapp at its own host path (`DEPLOY_DIR`, set by `deploy.sh`) so compose paths
+resolve. Apply actions are written to `config-audit.log`. If the deploy dir
+isn't mounted (e.g. a manual `docker compose` without `deploy.sh`), the web
+Apply button no-ops with a message and you redeploy from the CLI instead.
+
 ### First deploy on a fresh host
 
 ```bash

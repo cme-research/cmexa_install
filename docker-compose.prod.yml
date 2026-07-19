@@ -23,6 +23,33 @@ services:
       retries: 3
       start_period: 5s
 
+  # Least-privilege Docker API in front of the raw socket. Bound to localhost
+  # only (the host-networked webapp reaches it at 127.0.0.1:2375); the LAN/VPN
+  # cannot. Only the verbs `docker compose up` + `docker logs` need are enabled.
+  socket-proxy:
+    image: tecnativa/docker-socket-proxy:latest
+    container_name: cmexa-socket-proxy
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:2375:2375"
+    environment:
+      - CONTAINERS=1
+      - IMAGES=1
+      - NETWORKS=1
+      - VOLUMES=1
+      - INFO=1
+      - VERSION=1
+      - PING=1
+      - POST=1        # required for create/start/recreate
+      - BUILD=0
+      - EXEC=0
+      - SWARM=0
+      - SYSTEM=0
+      - SECRETS=0
+      - CONFIGS=0
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+
   webapp:
     image: ghcr.io/cme-research/cmeresearch_amr_webcontrol:${WEBAPP_VERSION:?WEBAPP_VERSION must be set (e.g. jazzy-0.1.0); run deploy.sh --version <distro>-<semver>}
     container_name: cmexa-webapp
@@ -31,16 +58,25 @@ services:
     depends_on:
       mosquitto:
         condition: service_healthy
+      socket-proxy:
+        condition: service_started
     environment:
       # Selects app_config.<instance>.json inside the image so one webapp image
       # serves any robot (falls back to app_config.json if no match).
       - ROBOT_INSTANCE=${ROBOT_INSTANCE:-cmexaiii-001}
+      # robot.yaml lives in the deploy dir (mounted below at its own host path).
+      - ROBOT_CONFIG_FILE=${DEPLOY_DIR:?DEPLOY_DIR must be set by deploy.sh}/robot.yaml
+      # One-click Apply: recreate containers via the socket-proxy, using the
+      # compose file in the deploy dir. DEPLOY_DIR is the host path so compose
+      # bind-mount paths resolve identically inside the webapp and on the host.
+      - DEPLOY_DIR=${DEPLOY_DIR}
+      - COMPOSE_FILE=docker-compose.prod.yml
+      - DOCKER_HOST=tcp://127.0.0.1:2375
+      - CONFIG_AUDIT_LOG=${DEPLOY_DIR}/config-audit.log
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-      # Single source of truth, mounted read-only. The webapp reads it directly
-      # from Phase 1 on (replacing the baked app_config.<instance>.json); the
-      # privileged Apply flow (Phase 3) will remount it read-write.
-      - ./robot.yaml:/robot/config/robot.yaml:ro
+      # No raw docker socket here — the webapp reaches Docker only via the proxy.
+      # Deploy dir mounted read-write at its own host path (config edits + Apply).
+      - ${DEPLOY_DIR}:${DEPLOY_DIR}
 
   brickd:
     image: ghcr.io/cme-research/cmexa_brickd:${ROBOT_VERSION:?ROBOT_VERSION must be set (e.g. jazzy-0.1.0); run deploy.sh --version <distro>-<semver>}
