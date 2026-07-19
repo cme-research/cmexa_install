@@ -29,6 +29,10 @@ CONFIG_FILE="robot.yaml"
 ENV_FILE=".compose.env"
 RENDER="scripts/render_config.py"
 
+# Absolute host path of this deploy dir. The webapp mounts it at the SAME path
+# (compose bind-mount path resolution) and uses it for the one-click Apply flow.
+export DEPLOY_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 # Regex: <lowercase-distro>-<latest|semver|sha40>
 VERSION_REGEX='^[a-z]+-(latest|[0-9]+(\.[0-9]+){0,2}(-[0-9A-Za-z.-]+)?|[0-9a-f]{40})$'
 
