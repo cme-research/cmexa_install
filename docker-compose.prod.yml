@@ -70,6 +70,11 @@ services:
     environment:
       - ROBOT=${ROBOT:-cmexaiii}
       - ROBOT_ENV=${ROBOT_ENV:-house}
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-12}
+    # Select the robot's hardware launch. The image CMD is cmexaiii-specific, so
+    # a non-cmexaiii robot MUST override it here (the baked CMD would otherwise
+    # run the mecanum hardware launch regardless of ROBOT).
+    command: ros2 launch cmeresearch_bringup ${HARDWARE_LAUNCH_FILE:-cmexaiii_hardware.launch.py}
     healthcheck:
       test: ["CMD-SHELL", "pgrep -f ros2_control_node >/dev/null && pgrep -f robot_state_publisher >/dev/null"]
       interval: 5s
@@ -87,6 +92,10 @@ services:
     depends_on:
       hardware:
         condition: service_healthy
+    # nav must share the hardware container's DDS domain to see /scan + odom TF.
+    environment:
+      - ROBOT=${ROBOT:-cmexaiii}
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-12}
     command: ros2 launch cmeresearch_bringup ${LAUNCH_FILE:-cmexaiii_nav_mapping.launch.py}
     volumes:
       - /robot/data/maps:/maps

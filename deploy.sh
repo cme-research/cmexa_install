@@ -169,6 +169,15 @@ if [[ -z "$LAUNCH_FILE" || "$LAUNCH_FILE" != ${ROBOT}_* ]]; then
   LAUNCH_FILE="${ROBOT}_nav_mapping.launch.py"
 fi
 
+# Hardware launch is derived from the robot type. The hardware image's CMD is
+# cmexaiii-specific, so compose must override it (see docker-compose.prod.yml).
+HARDWARE_LAUNCH_FILE="${ROBOT}_hardware.launch.py"
+
+# DDS domain: .env override, else 12 (the historical baked-in default). Give a
+# second robot on the SAME subnet its own domain to isolate the two ROS graphs.
+ROS_DOMAIN_ID="$(read_env_value ROS_DOMAIN_ID)"
+ROS_DOMAIN_ID="${ROS_DOMAIN_ID:-12}"
+
 COMPOSE_FILE="docker-compose.prod.yml"
 
 PROFILE_ARGS=()
@@ -179,7 +188,7 @@ else
   NAV_LABEL="disabled"
 fi
 
-echo "==> Deploying ${ROBOT} stack (instance: ${ROBOT_INSTANCE}, robot: ${ROBOT_VERSION}, webapp: ${WEBAPP_VERSION}, nav: ${NAV_LABEL})"
+echo "==> Deploying ${ROBOT} stack (instance: ${ROBOT_INSTANCE}, domain: ${ROS_DOMAIN_ID}, robot: ${ROBOT_VERSION}, webapp: ${WEBAPP_VERSION}, nav: ${NAV_LABEL})"
 
 # Write version + identity overrides into .env (replace or append)
 update_env() {
@@ -197,6 +206,7 @@ update_env "WEBAPP_VERSION" "${WEBAPP_VERSION}"
 update_env "ROBOT" "${ROBOT}"
 update_env "ROBOT_INSTANCE" "${ROBOT_INSTANCE}"
 update_env "LAUNCH_FILE" "${LAUNCH_FILE}"
+update_env "ROS_DOMAIN_ID" "${ROS_DOMAIN_ID}"
 
 # Render the mosquitto bridge config for this instance from the template. The
 # topic routes and remote_clientid are instance-scoped; substituting here keeps
@@ -230,6 +240,8 @@ COMPOSE_ENV=(
   "ROBOT=${ROBOT}"
   "ROBOT_INSTANCE=${ROBOT_INSTANCE}"
   "LAUNCH_FILE=${LAUNCH_FILE}"
+  "HARDWARE_LAUNCH_FILE=${HARDWARE_LAUNCH_FILE}"
+  "ROS_DOMAIN_ID=${ROS_DOMAIN_ID}"
 )
 
 echo "==> Pulling images..."

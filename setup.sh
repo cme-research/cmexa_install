@@ -19,6 +19,9 @@ LAUNCH_FILE=cmexaiii_nav_mapping.launch.py
 ROBOT=cmexaiii
 ROBOT_INSTANCE=cmexaiii-001
 
+# DDS domain (see .env.example). Give a second robot on the same subnet its own.
+ROS_DOMAIN_ID=12
+
 # Input group GID for joystick access (auto-detected)
 INPUT_GID=${INPUT_GID}
 EOF
