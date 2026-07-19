@@ -1,3 +1,6 @@
+# Per-host config (generated/authored on the robot; never committed).
 .env
+robot.yaml
+.compose.env
 __pycache__/
 *.pyc

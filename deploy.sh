@@ -1,5 +1,10 @@
 #!/bin/bash
-# Deploy CMEXAIII robot stack from GHCR.
+# Deploy a robot stack from GHCR.
+#
+# robot.yaml is the single source of truth for this host (identity, DDS domain,
+# image versions, nav mode). This script compiles it via scripts/render_config.py
+# into the generated compose env-file (.compose.env) and the mosquitto bridge
+# config, then brings the stack up. CLI flags below edit robot.yaml in place.
 #
 # Robot images (cmexa_hardware, cmexa_nav) and webapp (cmeresearch_amr_webcontrol)
 # share the same '<distro>-<semver>' tag scheme on GHCR. By default --version
@@ -20,21 +25,34 @@
 
 set -euo pipefail
 
+CONFIG_FILE="robot.yaml"
+ENV_FILE=".compose.env"
+RENDER="scripts/render_config.py"
+
 # Regex: <lowercase-distro>-<latest|semver|sha40>
 VERSION_REGEX='^[a-z]+-(latest|[0-9]+(\.[0-9]+){0,2}(-[0-9A-Za-z.-]+)?|[0-9a-f]{40})$'
 
 usage() {
   cat <<EOF
-Usage: bash deploy.sh --version <distro>-<tag> [--webapp-version <distro>-<tag>] [--nav]
+Usage: bash deploy.sh [--version <distro>-<tag>] [--webapp-version <distro>-<tag>]
+                      [--robot <name>] [--instance <name>] [--domain <id>] [--nav]
+
+Config lives in robot.yaml (the single source of truth). The flags below edit it;
+omitting a flag keeps whatever robot.yaml already has. On a fresh host robot.yaml
+is seeded from robot.example.yaml (or migrated from a legacy .env).
 
 By default this deploys mosquitto, webapp, brickd and hardware only.
 Pass --nav to additionally start the navigation container.
 
+Identity (defaults preserve the production mecanum robot):
+  --robot      robot type; selects launch/description/config + container names
+  --instance   MQTT instance id -> cmeresearch/<instance>/... + bridge routing
+  --domain     ROS_DOMAIN_ID; give robots on one subnet distinct domains
+
 Examples:
-  bash deploy.sh --version jazzy-0.1.0                # hardware stack only
-  bash deploy.sh --version jazzy-0.1.0 --nav          # hardware + nav
-  bash deploy.sh --version jazzy-latest --nav
-  bash deploy.sh --version jazzy-0.1.0 --webapp-version jazzy-0.2.0 --nav
+  bash deploy.sh --version jazzy-0.1.0                # cmexaiii hardware stack
+  bash deploy.sh --version jazzy-0.1.0 --nav          # cmexaiii + nav
+  bash deploy.sh --version jazzy-latest --robot cmexamini --instance cmexamini-001 --domain 13 --nav
 
 Versions must match: ${VERSION_REGEX}
 EOF
@@ -44,7 +62,7 @@ validate_version() {
   local label="$1"
   local value="$2"
   if [[ -z "$value" ]]; then
-    echo "ERROR: ${label} is empty." >&2
+    echo "ERROR: ${label} is empty — pass --version <distro>-<semver> (robot.yaml has no image version yet)." >&2
     usage >&2
     exit 1
   fi
@@ -59,68 +77,57 @@ validate_version() {
   fi
 }
 
-ROBOT_VERSION=""
-WEBAPP_VERSION=""
-ROBOT_VERSION_SET=false
-WEBAPP_VERSION_SET=false
 USE_NAV=false
+# Overrides collected from flags and applied to robot.yaml via render_config.
+SETS=()
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --version)
-      ROBOT_VERSION="${2:-}"
-      ROBOT_VERSION_SET=true
-      shift 2
-      ;;
-    --webapp-version)
-      WEBAPP_VERSION="${2:-}"
-      WEBAPP_VERSION_SET=true
-      shift 2
-      ;;
-    --nav)
-      USE_NAV=true
-      shift
-      ;;
-    -h|--help)
-      usage
-      exit 0
-      ;;
-    *)
-      echo "Unknown argument: $1" >&2
-      usage >&2
-      exit 1
-      ;;
+    --version)         SETS+=(--set "images.robot_version=${2:-}");   shift 2 ;;
+    --webapp-version)  SETS+=(--set "images.webapp_version=${2:-}");  shift 2 ;;
+    --robot)           SETS+=(--set "identity.robot=${2:-}");         shift 2 ;;
+    --instance)        SETS+=(--set "identity.instance=${2:-}");      shift 2 ;;
+    --domain)          SETS+=(--set "ros.domain_id=${2:-}");          shift 2 ;;
+    --nav)             USE_NAV=true;                                  shift ;;
+    -h|--help)         usage; exit 0 ;;
+    *) echo "Unknown argument: $1" >&2; usage >&2; exit 1 ;;
   esac
 done
 
-# Generate .env if it doesn't exist yet (also sources values like INPUT_GID)
-if [ ! -f .env ]; then
-  echo "==> No .env found, running setup.sh first..."
-  bash setup.sh
-fi
-
-# If a flag was not passed, fall back to whatever is pinned in .env.
-read_env_value() {
-  local key="$1"
-  if grep -q "^${key}=" .env 2>/dev/null; then
-    awk -F= -v k="$key" '$1==k {sub(/^[^=]+=/,""); print; exit}' .env
-  fi
+command -v python3 >/dev/null 2>&1 || {
+  echo "ERROR: python3 is required (deploy uses scripts/render_config.py)." >&2
+  exit 1
 }
 
-if ! $ROBOT_VERSION_SET; then
-  ROBOT_VERSION="$(read_env_value ROBOT_VERSION)"
-fi
-
-# Webapp defaults to the same version as the robot when not explicitly pinned.
-if ! $WEBAPP_VERSION_SET; then
-  WEBAPP_VERSION="$(read_env_value WEBAPP_VERSION)"
-  if [[ -z "$WEBAPP_VERSION" || "$WEBAPP_VERSION" == "latest" ]]; then
-    WEBAPP_VERSION="$ROBOT_VERSION"
+# Ensure robot.yaml exists: migrate a legacy .env, else seed from setup.sh.
+MIGRATE_ARGS=()
+if [ ! -f "$CONFIG_FILE" ]; then
+  if [ -f .env ]; then
+    echo "==> No robot.yaml — migrating legacy .env into it..."
+    MIGRATE_ARGS=(--migrate-env .env)
+  else
+    echo "==> No robot.yaml — seeding host config via setup.sh..."
+    bash setup.sh
   fi
 fi
 
-validate_version "ROBOT_VERSION"  "$ROBOT_VERSION"
-validate_version "WEBAPP_VERSION" "$WEBAPP_VERSION"
+# Compile robot.yaml -> env-file + bridge.conf (persisting flag edits/migration).
+WRITE_ARGS=()
+if [[ ${#SETS[@]} -gt 0 || ${#MIGRATE_ARGS[@]} -gt 0 ]]; then
+  WRITE_ARGS=(--write)
+fi
+python3 "$RENDER" --config "$CONFIG_FILE" \
+  "${MIGRATE_ARGS[@]}" "${SETS[@]}" "${WRITE_ARGS[@]}" \
+  --emit-env "$ENV_FILE" --render-bridge
+
+# Load the resolved values for this script's own logic (echo, nav cleanup).
+set -a
+# shellcheck disable=SC1090
+. "$ENV_FILE"
+set +a
+
+validate_version "ROBOT_VERSION"  "${ROBOT_VERSION:-}"
+validate_version "WEBAPP_VERSION" "${WEBAPP_VERSION:-}"
 
 COMPOSE_FILE="docker-compose.prod.yml"
 
@@ -132,48 +139,31 @@ else
   NAV_LABEL="disabled"
 fi
 
-echo "==> Deploying CMEXAIII stack (robot: ${ROBOT_VERSION}, webapp: ${WEBAPP_VERSION}, nav: ${NAV_LABEL})"
-
-# Write version overrides into .env (replace or append)
-update_env() {
-  local key="$1"
-  local value="$2"
-  if grep -q "^${key}=" .env; then
-    sed -i "s|^${key}=.*|${key}=${value}|" .env
-  else
-    echo "${key}=${value}" >> .env
-  fi
-}
-
-update_env "ROBOT_VERSION" "${ROBOT_VERSION}"
-update_env "WEBAPP_VERSION" "${WEBAPP_VERSION}"
+echo "==> Deploying ${ROBOT} stack (instance: ${ROBOT_INSTANCE}, domain: ${ROS_DOMAIN_ID}, robot: ${ROBOT_VERSION}, webapp: ${WEBAPP_VERSION}, nav: ${NAV_LABEL})"
 
 # If --nav is NOT set, stop any previously running nav container so we don't
 # leave a stale one behind from an earlier full deploy.
 if ! $USE_NAV; then
-  if docker ps -a --format '{{.Names}}' | grep -qx cmexaiii-nav; then
+  if docker ps -a --format '{{.Names}}' | grep -qx "${ROBOT}-nav"; then
     echo "==> --nav not set: stopping leftover nav container..."
-    docker compose -f "${COMPOSE_FILE}" --profile nav stop nav 2>/dev/null || true
-    docker compose -f "${COMPOSE_FILE}" --profile nav rm -f nav 2>/dev/null || true
+    docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" --profile nav stop nav 2>/dev/null || true
+    docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" --profile nav rm -f nav 2>/dev/null || true
   fi
 fi
 
 echo "==> Pulling images..."
-ROBOT_VERSION="${ROBOT_VERSION}" WEBAPP_VERSION="${WEBAPP_VERSION}" \
-  docker compose -f "${COMPOSE_FILE}" "${PROFILE_ARGS[@]}" pull
+docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" "${PROFILE_ARGS[@]}" pull
 
 echo "==> Starting services..."
-ROBOT_VERSION="${ROBOT_VERSION}" WEBAPP_VERSION="${WEBAPP_VERSION}" \
-  docker compose -f "${COMPOSE_FILE}" "${PROFILE_ARGS[@]}" up -d
+docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" "${PROFILE_ARGS[@]}" up -d
 
 # Mosquitto's image tag is unpinned (eclipse-mosquitto:latest) and its config
 # is bind-mounted from docker/mosquitto/bridge.conf. Neither bind-mount content
 # changes nor unchanged image digests trigger `up -d` to recreate. Force a
 # recreate so config edits actually reach the running container.
 echo "==> Recreating mosquitto to pick up bind-mounted config changes..."
-ROBOT_VERSION="${ROBOT_VERSION}" WEBAPP_VERSION="${WEBAPP_VERSION}" \
-  docker compose -f "${COMPOSE_FILE}" "${PROFILE_ARGS[@]}" up -d --force-recreate --no-deps mosquitto
+docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" "${PROFILE_ARGS[@]}" up -d --force-recreate --no-deps mosquitto
 
 echo ""
 echo "==> Done. Running services:"
-docker compose -f "${COMPOSE_FILE}" "${PROFILE_ARGS[@]}" ps
+docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" "${PROFILE_ARGS[@]}" ps
