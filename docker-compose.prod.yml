@@ -37,6 +37,10 @@ services:
       - ROBOT_INSTANCE=${ROBOT_INSTANCE:-cmexaiii-001}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
+      # Single source of truth, mounted read-only. The webapp reads it directly
+      # from Phase 1 on (replacing the baked app_config.<instance>.json); the
+      # privileged Apply flow (Phase 3) will remount it read-write.
+      - ./robot.yaml:/robot/config/robot.yaml:ro
 
   brickd:
     image: ghcr.io/cme-research/cmexa_brickd:${ROBOT_VERSION:?ROBOT_VERSION must be set (e.g. jazzy-0.1.0); run deploy.sh --version <distro>-<semver>}

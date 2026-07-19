@@ -1,29 +1,24 @@
 #!/bin/bash
-# Generates .env with system-specific values.
-# Run once after cloning on a new host, then edit LAUNCH_FILE as needed.
+# Seed robot.yaml (the single source of truth) on a fresh host.
+# Run once after cloning; then edit robot.yaml or use deploy.sh flags.
 
 set -e
 
 INPUT_GID=$(getent group input | cut -d: -f3)
-
 if [ -z "$INPUT_GID" ]; then
-  echo "WARNING: 'input' group not found. INPUT_GID will be empty."
+  echo "WARNING: 'input' group not found. host.input_gid will be empty."
 fi
 
-cat > .env << EOF
-# Nav mode: switch between <robot>_nav_mapping.launch.py and <robot>_nav_localization.launch.py
-LAUNCH_FILE=cmexaiii_nav_mapping.launch.py
+if [ -f robot.yaml ]; then
+  echo "robot.yaml already exists — leaving it untouched."
+  exit 0
+fi
 
-# Robot identity (see .env.example). Defaults target the production mecanum
-# robot; deploy.sh --robot/--instance overwrites these.
-ROBOT=cmexaiii
-ROBOT_INSTANCE=cmexaiii-001
+cp robot.example.yaml robot.yaml
+if [ -n "$INPUT_GID" ]; then
+  # Fill the host-detected joystick GID (was INPUT_GID in the old .env).
+  sed -i "s/input_gid: \"\"/input_gid: ${INPUT_GID}/" robot.yaml
+fi
 
-# DDS domain (see .env.example). Give a second robot on the same subnet its own.
-ROS_DOMAIN_ID=12
-
-# Input group GID for joystick access (auto-detected)
-INPUT_GID=${INPUT_GID}
-EOF
-
-echo ".env created (ROBOT=cmexaiii, INPUT_GID=${INPUT_GID})"
+echo "robot.yaml created (robot=cmexaiii, input_gid=${INPUT_GID})."
+echo "Edit robot.yaml or pass deploy.sh flags (e.g. --robot cmexamini --instance cmexamini-001)."
