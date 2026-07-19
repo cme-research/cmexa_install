@@ -71,6 +71,43 @@ bash deploy.sh --version jazzy-0.1.1
 
 This pulls `ghcr.io/cme-research/cmexa_hardware:jazzy-0.1.1`, `cmexa_nav:jazzy-0.1.1`, and `cmeresearch_amr_webcontrol:jazzy-0.1.1`, writes the version into `.env`, and starts all services. See `bash deploy.sh --help` for the full accepted version syntax.
 
+### Deploying a second robot type (e.g. the diff-drive `cmexamini`)
+
+The same `cmexa_hardware` / `cmexa_nav` / webapp images serve **every** robot — the
+robot is selected at runtime, not by a separate image. All robot configuration
+lives in **`.env` on the robot host** (per-host, gitignored). Two identity fields
+drive everything else:
+
+| `.env` field | Selects |
+|---|---|
+| `ROBOT` | ROS launch + description (`<ROBOT>_hardware.launch.py`, `urdf/<ROBOT>/`, `config/<ROBOT>/`) and the container names `<ROBOT>-hardware` / `<ROBOT>-nav` |
+| `ROBOT_INSTANCE` | MQTT topic prefix `cmeresearch/<INSTANCE>/…`, the rendered mosquitto `bridge.conf` routes, and the webapp config (`app_config.<INSTANCE>.json`) |
+| `ROS_DOMAIN_ID` | DDS domain for this robot's ROS 2 graph (hardware + nav). Default `12`. Give a second robot on the **same subnet** its own domain so the graphs don't cross-discover |
+
+Configure it either way:
+
+```bash
+# (a) via flags — deploy.sh writes them into .env for you:
+bash deploy.sh --version jazzy-latest --robot cmexamini --instance cmexamini-001 --nav
+
+# (b) or edit .env directly, then `bash deploy.sh`:
+#   ROBOT=cmexamini
+#   ROBOT_INSTANCE=cmexamini-001
+#   LAUNCH_FILE=cmexamini_nav_mapping.launch.py
+#   ROS_DOMAIN_ID=13        # only if sharing a subnet with another robot
+```
+
+Leaving all three unset reproduces the production mecanum `cmexaiii` / `cmexaiii-001`
+deploy exactly.
+
+> **Image rebuild required first.** The launch files, configs and per-instance
+> webapp config for a new robot must be baked into the images: after the robot's
+> `cmeresearch_bringup` / `cmeresearch_description` / `cmeresearch_amr_webcontrol`
+> changes merge, bump their SHAs in `docker/hardware.repos` + `docker/nav.repos`
+> and rebuild `cmexa_hardware` / `cmexa_nav` (and publish the webapp image).
+> No Dockerfile changes are needed — the hardware image already installs
+> lidar/mqtt_bridge/robot_state and the nav image already has nav2/slam.
+
 ### Update to latest
 
 ```bash

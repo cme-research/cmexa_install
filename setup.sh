@@ -11,11 +11,19 @@ if [ -z "$INPUT_GID" ]; then
 fi
 
 cat > .env << EOF
-# Nav mode: switch between cmexaiii_nav_mapping.launch.py and cmexaiii_nav_localization.launch.py
+# Nav mode: switch between <robot>_nav_mapping.launch.py and <robot>_nav_localization.launch.py
 LAUNCH_FILE=cmexaiii_nav_mapping.launch.py
+
+# Robot identity (see .env.example). Defaults target the production mecanum
+# robot; deploy.sh --robot/--instance overwrites these.
+ROBOT=cmexaiii
+ROBOT_INSTANCE=cmexaiii-001
+
+# DDS domain (see .env.example). Give a second robot on the same subnet its own.
+ROS_DOMAIN_ID=12
 
 # Input group GID for joystick access (auto-detected)
 INPUT_GID=${INPUT_GID}
 EOF
 
-echo ".env created (INPUT_GID=${INPUT_GID})"
+echo ".env created (ROBOT=cmexaiii, INPUT_GID=${INPUT_GID})"
