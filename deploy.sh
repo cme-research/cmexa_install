@@ -25,16 +25,26 @@ VERSION_REGEX='^[a-z]+-(latest|[0-9]+(\.[0-9]+){0,2}(-[0-9A-Za-z.-]+)?|[0-9a-f]{
 
 usage() {
   cat <<EOF
-Usage: bash deploy.sh --version <distro>-<tag> [--webapp-version <distro>-<tag>] [--nav]
+Usage: bash deploy.sh --version <distro>-<tag> [--webapp-version <distro>-<tag>]
+                      [--robot <name>] [--instance <name>] [--nav]
 
 By default this deploys mosquitto, webapp, brickd and hardware only.
 Pass --nav to additionally start the navigation container.
 
+Robot identity (defaults preserve the production mecanum robot):
+  --robot     robot type; selects the ROS launch/description via the ROBOT env
+              and the container names (<robot>-hardware / <robot>-nav).
+              default: cmexaiii
+  --instance  MQTT instance id; the cmeresearch/<instance>/... topic prefix and
+              the mosquitto bridge routing. default: <robot>-001
+
 Examples:
-  bash deploy.sh --version jazzy-0.1.0                # hardware stack only
-  bash deploy.sh --version jazzy-0.1.0 --nav          # hardware + nav
+  bash deploy.sh --version jazzy-0.1.0                # cmexaiii hardware stack
+  bash deploy.sh --version jazzy-0.1.0 --nav          # cmexaiii + nav
   bash deploy.sh --version jazzy-latest --nav
   bash deploy.sh --version jazzy-0.1.0 --webapp-version jazzy-0.2.0 --nav
+  # diff-drive mini:
+  bash deploy.sh --version jazzy-latest --robot cmexamini --instance cmexamini-001 --nav
 
 Versions must match: ${VERSION_REGEX}
 EOF
@@ -64,6 +74,13 @@ WEBAPP_VERSION=""
 ROBOT_VERSION_SET=false
 WEBAPP_VERSION_SET=false
 USE_NAV=false
+# Robot identity (type + instance). Default to the production mecanum cmexaiii /
+# cmexaiii-001 so existing deploys are unaffected. A second robot type (e.g. the
+# diff-drive mini) sets --robot cmexamini --instance cmexamini-001.
+ROBOT=""
+ROBOT_INSTANCE=""
+ROBOT_SET=false
+ROBOT_INSTANCE_SET=false
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -75,6 +92,16 @@ while [[ $# -gt 0 ]]; do
     --webapp-version)
       WEBAPP_VERSION="${2:-}"
       WEBAPP_VERSION_SET=true
+      shift 2
+      ;;
+    --robot)
+      ROBOT="${2:-}"
+      ROBOT_SET=true
+      shift 2
+      ;;
+    --instance)
+      ROBOT_INSTANCE="${2:-}"
+      ROBOT_INSTANCE_SET=true
       shift 2
       ;;
     --nav)
@@ -122,6 +149,26 @@ fi
 validate_version "ROBOT_VERSION"  "$ROBOT_VERSION"
 validate_version "WEBAPP_VERSION" "$WEBAPP_VERSION"
 
+# Resolve robot identity: CLI flag > .env > default (cmexaiii / <robot>-001).
+if ! $ROBOT_SET; then
+  ROBOT="$(read_env_value ROBOT)"
+fi
+ROBOT="${ROBOT:-cmexaiii}"
+
+if ! $ROBOT_INSTANCE_SET; then
+  ROBOT_INSTANCE="$(read_env_value ROBOT_INSTANCE)"
+fi
+ROBOT_INSTANCE="${ROBOT_INSTANCE:-${ROBOT}-001}"
+
+# Nav launch file: .env override, else the robot's mapping launch by convention.
+# Auto-correct a launch file that does not belong to this robot (e.g. a stale
+# cmexaiii default written by setup.sh when deploying the mini). An explicit
+# same-robot choice (mapping vs localization) is preserved.
+LAUNCH_FILE="$(read_env_value LAUNCH_FILE)"
+if [[ -z "$LAUNCH_FILE" || "$LAUNCH_FILE" != ${ROBOT}_* ]]; then
+  LAUNCH_FILE="${ROBOT}_nav_mapping.launch.py"
+fi
+
 COMPOSE_FILE="docker-compose.prod.yml"
 
 PROFILE_ARGS=()
@@ -132,9 +179,9 @@ else
   NAV_LABEL="disabled"
 fi
 
-echo "==> Deploying CMEXAIII stack (robot: ${ROBOT_VERSION}, webapp: ${WEBAPP_VERSION}, nav: ${NAV_LABEL})"
+echo "==> Deploying ${ROBOT} stack (instance: ${ROBOT_INSTANCE}, robot: ${ROBOT_VERSION}, webapp: ${WEBAPP_VERSION}, nav: ${NAV_LABEL})"
 
-# Write version overrides into .env (replace or append)
+# Write version + identity overrides into .env (replace or append)
 update_env() {
   local key="$1"
   local value="$2"
@@ -147,23 +194,49 @@ update_env() {
 
 update_env "ROBOT_VERSION" "${ROBOT_VERSION}"
 update_env "WEBAPP_VERSION" "${WEBAPP_VERSION}"
+update_env "ROBOT" "${ROBOT}"
+update_env "ROBOT_INSTANCE" "${ROBOT_INSTANCE}"
+update_env "LAUNCH_FILE" "${LAUNCH_FILE}"
+
+# Render the mosquitto bridge config for this instance from the template. The
+# topic routes and remote_clientid are instance-scoped; substituting here keeps
+# a single source of truth (bridge.conf.template) across robot types. For
+# cmexaiii/cmexaiii-001 this reproduces the committed bridge.conf byte-for-byte.
+BRIDGE_TEMPLATE="docker/mosquitto/bridge.conf.template"
+BRIDGE_CONF="docker/mosquitto/bridge.conf"
+if [[ -f "$BRIDGE_TEMPLATE" ]]; then
+  echo "==> Rendering ${BRIDGE_CONF} for ${ROBOT_INSTANCE}..."
+  sed -e "s@__ROBOT_INSTANCE__@${ROBOT_INSTANCE}@g" \
+      -e "s@__ROBOT__@${ROBOT}@g" \
+      "$BRIDGE_TEMPLATE" > "$BRIDGE_CONF"
+fi
 
 # If --nav is NOT set, stop any previously running nav container so we don't
 # leave a stale one behind from an earlier full deploy.
 if ! $USE_NAV; then
-  if docker ps -a --format '{{.Names}}' | grep -qx cmexaiii-nav; then
+  if docker ps -a --format '{{.Names}}' | grep -qx "${ROBOT}-nav"; then
     echo "==> --nav not set: stopping leftover nav container..."
-    docker compose -f "${COMPOSE_FILE}" --profile nav stop nav 2>/dev/null || true
-    docker compose -f "${COMPOSE_FILE}" --profile nav rm -f nav 2>/dev/null || true
+    ROBOT="${ROBOT}" LAUNCH_FILE="${LAUNCH_FILE}" \
+      docker compose -f "${COMPOSE_FILE}" --profile nav stop nav 2>/dev/null || true
+    ROBOT="${ROBOT}" LAUNCH_FILE="${LAUNCH_FILE}" \
+      docker compose -f "${COMPOSE_FILE}" --profile nav rm -f nav 2>/dev/null || true
   fi
 fi
 
+# Env exported to every compose call: image tags + robot identity + nav launch.
+COMPOSE_ENV=(
+  "ROBOT_VERSION=${ROBOT_VERSION}"
+  "WEBAPP_VERSION=${WEBAPP_VERSION}"
+  "ROBOT=${ROBOT}"
+  "LAUNCH_FILE=${LAUNCH_FILE}"
+)
+
 echo "==> Pulling images..."
-ROBOT_VERSION="${ROBOT_VERSION}" WEBAPP_VERSION="${WEBAPP_VERSION}" \
+env "${COMPOSE_ENV[@]}" \
   docker compose -f "${COMPOSE_FILE}" "${PROFILE_ARGS[@]}" pull
 
 echo "==> Starting services..."
-ROBOT_VERSION="${ROBOT_VERSION}" WEBAPP_VERSION="${WEBAPP_VERSION}" \
+env "${COMPOSE_ENV[@]}" \
   docker compose -f "${COMPOSE_FILE}" "${PROFILE_ARGS[@]}" up -d
 
 # Mosquitto's image tag is unpinned (eclipse-mosquitto:latest) and its config
@@ -171,9 +244,10 @@ ROBOT_VERSION="${ROBOT_VERSION}" WEBAPP_VERSION="${WEBAPP_VERSION}" \
 # changes nor unchanged image digests trigger `up -d` to recreate. Force a
 # recreate so config edits actually reach the running container.
 echo "==> Recreating mosquitto to pick up bind-mounted config changes..."
-ROBOT_VERSION="${ROBOT_VERSION}" WEBAPP_VERSION="${WEBAPP_VERSION}" \
+env "${COMPOSE_ENV[@]}" \
   docker compose -f "${COMPOSE_FILE}" "${PROFILE_ARGS[@]}" up -d --force-recreate --no-deps mosquitto
 
 echo ""
 echo "==> Done. Running services:"
-docker compose -f "${COMPOSE_FILE}" "${PROFILE_ARGS[@]}" ps
+env "${COMPOSE_ENV[@]}" \
+  docker compose -f "${COMPOSE_FILE}" "${PROFILE_ARGS[@]}" ps

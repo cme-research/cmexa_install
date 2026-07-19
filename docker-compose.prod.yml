@@ -47,7 +47,7 @@ services:
 
   hardware:
     image: ghcr.io/cme-research/cmexa_hardware:${ROBOT_VERSION:?ROBOT_VERSION must be set (e.g. jazzy-0.1.0); run deploy.sh --version <distro>-<semver>}
-    container_name: cmexaiii-hardware
+    container_name: ${ROBOT:-cmexaiii}-hardware
     restart: unless-stopped
     network_mode: host
     privileged: true
@@ -64,8 +64,8 @@ services:
     group_add:
       - "${INPUT_GID}"
     environment:
-      - ROBOT=cmexaiii
-      - ROBOT_ENV=house
+      - ROBOT=${ROBOT:-cmexaiii}
+      - ROBOT_ENV=${ROBOT_ENV:-house}
     healthcheck:
       test: ["CMD-SHELL", "pgrep -f ros2_control_node >/dev/null && pgrep -f robot_state_publisher >/dev/null"]
       interval: 5s
@@ -75,7 +75,7 @@ services:
 
   nav:
     image: ghcr.io/cme-research/cmexa_nav:${ROBOT_VERSION:?ROBOT_VERSION must be set (e.g. jazzy-0.1.0); run deploy.sh --version <distro>-<semver>}
-    container_name: cmexaiii-nav
+    container_name: ${ROBOT:-cmexaiii}-nav
     restart: unless-stopped
     network_mode: host
     ipc: host
