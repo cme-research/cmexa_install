@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.8.0](https://github.com/cme-research/cmexa_install/compare/jazzy-v0.7.4...jazzy-v0.8.0) (2026-07-19)
+
+
+### Neue Features
+
+* **config:** robot.yaml single source of truth (web-config Phase 0) ([7e842b5](https://github.com/cme-research/cmexa_install/commit/7e842b5cdeff61c97b4ead3f413ed07670a3f970))
+* **config:** robot.yaml single source of truth (web-config Phase 0) ([ec947dc](https://github.com/cme-research/cmexa_install/commit/ec947dcd68a5a668c618430c8a797991046e8dc2))
+* **config:** socket-proxy + deploy-dir mount for one-click Apply (Phase 3 infra) ([eacbc38](https://github.com/cme-research/cmexa_install/commit/eacbc38fa774442aca77a1d5417d272efea7eff3))
+* **config:** socket-proxy + deploy-dir mount for one-click Apply (Phase 3 infra) ([c17ad75](https://github.com/cme-research/cmexa_install/commit/c17ad7567e9946e2d2b192fc2eca6c8f1a05c163))
+* **deploy:** parameterize stack on ROBOT/ROBOT_INSTANCE ([1fd52fb](https://github.com/cme-research/cmexa_install/commit/1fd52fbc5b86a8b01d7d593f4e7a7d3f1f8b2e5d))
+* **deploy:** parameterize stack on ROBOT/ROBOT_INSTANCE ([84bf062](https://github.com/cme-research/cmexa_install/commit/84bf0623f82e6ff3263226756480a2e3a9288839))
+* **deploy:** pass ROBOT_INSTANCE to the webapp container ([7d4957b](https://github.com/cme-research/cmexa_install/commit/7d4957bfbd8e92117c18f9480d416c57e764069e))
+* **repos:** bump bringup + description to include cmexamini ([db0fcc3](https://github.com/cme-research/cmexa_install/commit/db0fcc30c9a9ff96ab1e65d5f17ee876d20a03d0))
+* **repos:** bump bringup + description to include cmexamini ([2b5626f](https://github.com/cme-research/cmexa_install/commit/2b5626fa6836aa5e5a4e29e79e574e8f26233081))
+
+
+### Bug Fixes
+
+* **deploy:** make entrypoint honour ROBOT, select hardware launch, configurable ROS_DOMAIN_ID ([a26772c](https://github.com/cme-research/cmexa_install/commit/a26772c10bc3a36c10d7c8570010dcb4e4919d96))
+
 ## [0.7.4](https://github.com/cme-research/cmexa_install/compare/jazzy-v0.7.3...jazzy-v0.7.4) (2026-07-17)
 
 
