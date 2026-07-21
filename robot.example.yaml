@@ -57,7 +57,7 @@ map:
 
 # ---- Diff-drive mini reference (swap the blocks above for these) --------------
 # identity: { robot: cmexamini, instance: cmexamini-001, name: "Mini #1" }
-# ros:      { domain_id: 13, nav_launch: cmexamini_nav_mapping.launch.py }
+# ros:      { domain_id: 13, nav_launch: cmexamini_nav_mapping.launch.py, robot_env: house }
 # control:
 #   drive_type: diff
 #   limits: { max_linear_x: 0.3, max_linear_y: 0.0, max_angular_z: 1.0 }
