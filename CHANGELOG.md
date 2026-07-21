@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.8.1](https://github.com/cme-research/cmexa_install/compare/jazzy-v0.8.0...jazzy-v0.8.1) (2026-07-21)
+
+
+### Bug Fixes
+
+* **config:** document robot_env in cmexamini reference block ([0b801ee](https://github.com/cme-research/cmexa_install/commit/0b801ee592a41a5c5ae54f8263f4c8c9a2a7a567))
+* **config:** document robot_env in cmexamini reference block ([0e9efa8](https://github.com/cme-research/cmexa_install/commit/0e9efa85233ebbb0a00a95ad1294ac6ae2bb2961))
+
 ## [0.8.0](https://github.com/cme-research/cmexa_install/compare/jazzy-v0.7.4...jazzy-v0.8.0) (2026-07-19)
 
 
