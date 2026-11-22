@@ -67,6 +67,29 @@ jobs:
           source /opt/ros/jazzy/setup.bash
           colcon build --event-handlers console_cohesion+
 
+      # Run every package's tests against the exact pinned SHAs, so a SHA bump
+      # that breaks one repo's behaviour in combination with another fails here
+      # before images are built. ament linters (ctest label / pytest marker
+      # "linter") are excluded, matching the per-repo CI.
+      - name: colcon test
+        shell: bash
+        env:
+          ROS_LOCALHOST_ONLY: "1"
+        run: |
+          source /opt/ros/jazzy/setup.bash
+          source install/setup.bash
+          colcon test --event-handlers console_cohesion+ \
+            --ctest-args -LE linter \
+            --pytest-args -m "not linter" \
+            --return-code-on-test-failure
+
+      - name: colcon test-result
+        if: always()
+        shell: bash
+        run: |
+          source /opt/ros/jazzy/setup.bash
+          colcon test-result --verbose
+
   docker-build:
     name: docker multi-arch (no push)
     needs: colcon-build
