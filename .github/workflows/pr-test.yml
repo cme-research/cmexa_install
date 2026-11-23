@@ -31,6 +31,9 @@ jobs:
         with:
           path: src/cmexa_install
 
+      - name: cmexa_install unit tests (render_config)
+        run: python3 src/cmexa_install/scripts/test_render_config.py
+
       - name: Merge docker/*.repos into one import file
         # Build a single .repos that unions hardware.repos + nav.repos so the
         # PR build exercises the exact SHAs that will land in the production
@@ -89,6 +92,45 @@ jobs:
         run: |
           source /opt/ros/jazzy/setup.bash
           colcon test-result --verbose
+
+  # Build the real hardware/nav images (amd64) and run docker/smoke_test.sh inside
+  # them: the launch files compose uses must load and every executable/package they
+  # reference must be in the image (catches missing install rules or run-time
+  # dependencies that the colcon test job cannot see, since images skip test deps).
+  image-smoke-test:
+    name: image smoke test (${{ matrix.target }}, amd64)
+    needs: colcon-build
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [hardware, nav]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build image (amd64, load)
+        uses: docker/build-push-action@v6
+        with:
+          context: ./docker
+          file: ./docker/Dockerfile.${{ matrix.target }}
+          platforms: linux/amd64
+          load: true
+          push: false
+          tags: cmexa-${{ matrix.target }}:smoke
+          cache-from: type=gha,scope=${{ matrix.target }}
+
+      - name: Run smoke test inside the image
+        run: |
+          docker run --rm \
+            -v "$PWD/docker/smoke_test.sh:/smoke_test.sh:ro" \
+            cmexa-${{ matrix.target }}:smoke bash /smoke_test.sh ${{ matrix.target }}
+
+      - name: Image size
+        if: always()
+        run: docker image ls cmexa-${{ matrix.target }}:smoke
 
   docker-build:
     name: docker multi-arch (no push)
