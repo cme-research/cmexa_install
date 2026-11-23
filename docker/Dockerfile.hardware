@@ -58,20 +58,32 @@ RUN wget https://download.tinkerforge.com/apt/$(. /etc/os-release; echo $ID)/tin
     && apt-get install python3-tinkerforge -y \
     && rm -rf /var/lib/apt/lists/*
 
-# Install ROS dependencies — skip nav2/slam/rviz (nav container handles those)
+# mqtt_bridge imports the 'inject' pip package. mqtt_bridge versions before its
+# python3-inject-pip fix declare the rosdep key python-inject-pip, which rosdistro
+# has removed, so rosdep silently skips it (-r) and the image would lack 'inject'.
+# Install it explicitly; once the pinned mqtt_bridge uses python3-inject-pip this
+# is a no-op.
+RUN pip3 install --no-cache-dir inject
+
+# Install ROS dependencies — skip nav2/slam/rviz (nav container handles those).
+# Only build/run-time dependency types: test-only packages (gtest, launch_testing,
+# pytest, ...) stay out of the image. Tests run in CI (pr-test.yml), not here.
 RUN source /opt/ros/jazzy/setup.bash \
     && cd /robot/ros2_ws \
     && apt-get update \
     && rosdep update \
     && rosdep fix-permissions \
     && rosdep install -y -r --from-paths src --ignore-src --rosdistro=jazzy \
+       --dependency-types build --dependency-types buildtool \
+       --dependency-types build_export --dependency-types buildtool_export \
+       --dependency-types exec \
        --skip-keys "nav2_bringup slam_toolbox rviz2 web_video_server" \
     && rm -rf /var/lib/apt/lists/*
 
 RUN apt-get update
 RUN source /opt/ros/jazzy/setup.bash \
     && cd /robot/ros2_ws \
-    && colcon build
+    && colcon build --cmake-args -DBUILD_TESTING=OFF
 
 RUN cd /robot/ros2_ws \
     && rm -rf build log src

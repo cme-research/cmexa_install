@@ -48,19 +48,24 @@ RUN mkdir -p /robot/ros2_ws/src \
 
 # Install ROS dependencies (nav2_bringup and slam_toolbox pulled via cmeresearch_bringup package.xml)
 # Skip hardware-specific packages not present in this image
+# Only build/run-time dependency types: test-only packages stay out of the
+# image. Tests run in CI (pr-test.yml), not here.
 RUN source /opt/ros/jazzy/setup.bash \
     && cd /robot/ros2_ws \
     && apt-get update \
     && rosdep update \
     && rosdep fix-permissions \
     && rosdep install -y -r --from-paths src --ignore-src --rosdistro=jazzy \
+       --dependency-types build --dependency-types buildtool \
+       --dependency-types build_export --dependency-types buildtool_export \
+       --dependency-types exec \
        --skip-keys "rviz2 web_video_server" \
     && rm -rf /var/lib/apt/lists/*
 
 RUN apt-get update
 RUN source /opt/ros/jazzy/setup.bash \
     && cd /robot/ros2_ws \
-    && colcon build
+    && colcon build --cmake-args -DBUILD_TESTING=OFF
 
 RUN cd /robot/ros2_ws \
     && rm -rf build log src
